@@ -1,0 +1,16 @@
+[project]
+name = "shinyrealtime"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.12.14",
+    "chatlas>=0.9.1",
+    "openai>=1.95.0",
+    "plotnine>=0.14.6",
+    "polars>=1.31.0",
+    "python-dotenv>=1.1.1",
+    "seaborn>=0.13.2",
+    "shiny>=1.4.0",
+]

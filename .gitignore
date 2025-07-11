@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+
+# Virtual environments
+.venv/
+
+# Node.js / TypeScript
+node_modules/
+
+# Build outputs
+www/app.js
+
+# Environment and secrets
+.env
+
+# OS generated files
+.DS_Store
