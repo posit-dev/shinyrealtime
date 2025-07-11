@@ -11,14 +11,26 @@ from realtime import realtime_server, realtime_ui
 
 load_dotenv()
 
-mtcars = pd.read_csv(Path(__file__).parent / "mtcars.csv")
 prompt = (Path(__file__).parent / "prompt.md").read_text()
 
+samples = []
 
-app_ui = ui.page_fluid(
+for ds in sns.get_dataset_names():
+    df = sns.load_dataset(ds)
+    if isinstance(df, pd.DataFrame):
+        globals()[ds] = df
+        samples.append(f"## {ds}\n\n{df.head().to_csv(index=False)}")
+
+prompt += "\n\n# Availble Datasets\n\n" + "\n\n".join(samples)
+
+app_ui = ui.page_fillable(
     realtime_ui("realtime1"),
-    ui.output_plot("plot"),
-    ui.output_code("code_text", placeholder=False),
+    ui.output_plot("plot", fill = True),
+    ui.div(
+        ui.output_code("code_text", placeholder=False),
+        style="height: 300px; max-height: 300px; overflow-y: auto; margin-bottom: 20px;",
+    ),
+    fillable = True,
 )
 
 

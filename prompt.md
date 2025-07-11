@@ -31,8 +31,8 @@ import seaborn as sns
 ```
 
 In your Python code, assume that the `matplotlib` library is already imported as
-`mpl` and that the `pandas` library is already imported as `pd`. There will
-already be an `mtcars` variable available that contains the data you need to plot.
+`mpl` and that the `pandas` library is already imported as `pd`. The Seaborn
+datasets listed below are all loaded under the given variable names.
 
 Calling fig.show() is never needed, and will cause the program to crash.
 
