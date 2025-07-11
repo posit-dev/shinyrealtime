@@ -1,14 +1,14 @@
 import "./binding";
 import "./styles.css";
 
-export async function openConnection(id: string, ephemeralKey: string) {
+export async function openConnection(ephemeralKey: string) {
   // Create a peer connection
   const pc = new RTCPeerConnection();
 
   // Set up to play remote audio from the model
   const audioEl = document.createElement("audio");
   audioEl.autoplay = true;
-  // audioEl.muted = true;
+
   pc.ontrack = (e) => (audioEl.srcObject = e.streams[0]);
 
   // Add local audio track for microphone input in the browser
@@ -16,22 +16,23 @@ export async function openConnection(id: string, ephemeralKey: string) {
     audio: true,
   });
   const micTrack = ms.getTracks()[0];
-  // micTrack.enabled = false;
   pc.addTrack(micTrack);
 
   // Set up data channel for sending and receiving events
   const dc = pc.createDataChannel("oai-events");
-  dc.addEventListener("message", (e) => {
-    // Realtime server events appear here!
-    console.log(e);
-    Shiny.setInputValue(id + "_event", e.data, { priority: "event" });
-  });
 
-  Shiny.addCustomMessageHandler("realtime_send", (events) => {
-    for (const event of events) {
-      console.log("Sending event:", event);
-      dc.send(JSON.stringify(event));
-    }
+  // Event listeners for data channel
+  const eventListeners = new Map();
+
+  dc.addEventListener("message", (e) => {
+    // Notify all registered event listeners
+    const data = e.data;
+    console.log("Received event:", data);
+
+    // Dispatch event to all registered handlers
+    eventListeners.forEach((callback) => {
+      callback(data);
+    });
   });
 
   // Start the session using the Session Description Protocol (SDP)
@@ -54,6 +55,70 @@ export async function openConnection(id: string, ephemeralKey: string) {
     sdp: await sdpResponse.text(),
   };
   await pc.setRemoteDescription(answer);
+
+  // Create the connection object
+  const connection = {
+    // Cleanup method to terminate the connection
+    close: () => {
+      console.log("Closing WebRTC connection");
+      // Clean up tracks
+      if (micTrack) {
+        micTrack.stop();
+      }
+      // Close data channel
+      if (dc) {
+        dc.close();
+      }
+      // Close peer connection
+      if (pc) {
+        pc.close();
+      }
+    },
+    // Audio element controls
+    setVolume: (volume: number) => {
+      audioEl.volume = Math.max(0, Math.min(1, volume));
+    },
+    muteAudio: () => {
+      audioEl.muted = true;
+    },
+    unmuteAudio: () => {
+      audioEl.muted = false;
+    },
+
+    // Microphone controls
+    muteMic: () => {
+      micTrack.enabled = false;
+    },
+    unmuteMic: () => {
+      micTrack.enabled = true;
+    },
+
+    // Data channel methods
+    sendMessage: (event: any) => {
+      console.log("Sending event:", event);
+      dc.send(JSON.stringify(event));
+    },
+    sendMessages: (events: any[]) => {
+      for (const event of events) {
+        console.log("Sending event:", event);
+        dc.send(JSON.stringify(event));
+      }
+    },
+    addEventListener: (id: string, callback: (data: any) => void) => {
+      eventListeners.set(id, callback);
+    },
+    removeEventListener: (id: string) => {
+      eventListeners.delete(id);
+    },
+
+    // Expose elements for advanced use cases
+    getAudioElement: () => audioEl,
+    getPeerConnection: () => pc,
+    getDataChannel: () => dc,
+    getMicrophoneTrack: () => micTrack,
+  };
+
+  return connection;
 }
 
 // Custom Shiny output binding for real-time display
@@ -65,7 +130,38 @@ $.extend(realtimeBinding, {
   },
 
   renderValue: function (el, data) {
-    openConnection(this.getId(el), data);
+    const id = this.getId(el);
+
+    // Store connection in element data for cleanup
+    let connectionPromise = openConnection(data).then((connection) => {
+      $(document).on("shiny:disconnected", function () {
+        console.log("Shiny disconnected, cleaning up any WebRTC connections");
+        connection.close();
+      });
+
+      $(el).data("rtConnection", connection);
+
+      // Set up Shiny-specific event handling
+      connection.addEventListener("shiny", (data) => {
+        Shiny.setInputValue(id + "_event", data, { priority: "event" });
+      });
+
+      // Set up message handler for sending events from Shiny
+      Shiny.addCustomMessageHandler("realtime_send", (events) => {
+        connection.sendMessages(events);
+      });
+
+      return connection;
+    });
+  },
+
+  // Clean up connection when element is removed/updated
+  unsubscribe: function (el) {
+    const connection = $(el).data("rtConnection");
+    if (connection && typeof connection.close === "function") {
+      console.log("Closing WebRTC connection due to element unsubscribe");
+      connection.close();
+    }
   },
 });
 

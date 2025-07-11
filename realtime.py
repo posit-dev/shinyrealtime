@@ -6,6 +6,7 @@ from typing import Any, Callable, Literal
 import aiohttp
 import chatlas
 import openai.types.beta.realtime as oair
+from faicons import icon_svg
 from htmltools import HTMLDependency
 from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
@@ -24,7 +25,12 @@ def dep() -> HTMLDependency:
 @module.ui
 def realtime_ui():
     return ui.TagList(
-        ui.div(dep(), class_="shinyrealtime", id=module.resolve_id("key")),
+        ui.div(
+            dep(),
+            icon_svg("volume-xmark"),
+            class_="shinyrealtime",
+            id=module.resolve_id("key"),
+        ),
         # ui.input_text("msg", "Message"),
         # ui.input_action_button("send", "Send"),
     )
