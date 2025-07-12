@@ -8,9 +8,6 @@ __pycache__/
 # Node.js / TypeScript
 node_modules/
 
-# Build outputs
-www/app.js
-
 # Environment and secrets
 .env
 
