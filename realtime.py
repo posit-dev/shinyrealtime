@@ -75,6 +75,7 @@ def realtime_server(
     api_key: str | None = None,
     **kwargs: Any,
 ):
+    api_key = api_key or os.getenv("OPENAI_API_KEY")
     tools_by_name = {tool.__name__: tool for tool in tools}
 
     @reactive.effect
@@ -101,7 +102,6 @@ def realtime_server(
     @output(suspend_when_hidden=False)
     @render.text
     async def key():
-        api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set.")
         async with aiohttp.ClientSession() as session:
