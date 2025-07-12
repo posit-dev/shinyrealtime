@@ -56,7 +56,7 @@ export async function openConnection(ephemeralKey: string) {
   };
   await pc.setRemoteDescription(answer);
 
-  // Create the connection object
+  // Create the connection object with getters/setters for properties
   const connection = {
     // Cleanup method to terminate the connection
     close: () => {
@@ -74,35 +74,35 @@ export async function openConnection(ephemeralKey: string) {
         pc.close();
       }
     },
-    // Audio element controls
-    setVolume: (volume: number) => {
-      audioEl.volume = Math.max(0, Math.min(1, volume));
+
+    // Volume property (0.0 - 1.0)
+    get volume() {
+      return audioEl.volume;
     },
-    muteAudio: () => {
-      audioEl.muted = true;
-    },
-    unmuteAudio: () => {
-      audioEl.muted = false;
+    set volume(value: number) {
+      audioEl.volume = Math.max(0, Math.min(1, value));
     },
 
-    // Microphone controls
-    muteMic: () => {
-      micTrack.enabled = false;
+    // Speaker muted property
+    get audioMuted() {
+      return audioEl.muted;
     },
-    unmuteMic: () => {
-      micTrack.enabled = true;
+    set audioMuted(value: boolean) {
+      audioEl.muted = value;
     },
 
-    // Data channel methods
-    sendMessage: (event: any) => {
+    // Microphone muted property
+    get micMuted() {
+      return !micTrack.enabled;
+    },
+    set micMuted(value: boolean) {
+      micTrack.enabled = !value;
+    },
+
+    // Data channel method
+    send: (event: any) => {
       console.log("Sending event:", event);
       dc.send(JSON.stringify(event));
-    },
-    sendMessages: (events: any[]) => {
-      for (const event of events) {
-        console.log("Sending event:", event);
-        dc.send(JSON.stringify(event));
-      }
     },
     addEventListener: (id: string, callback: (data: any) => void) => {
       eventListeners.set(id, callback);
@@ -139,6 +139,18 @@ $.extend(realtimeBinding, {
         connection.close();
       });
 
+      $(el).find(".btn-mute").show();
+      $(el).on("click", ".btn-mute", () => {
+        connection.micMuted = true;
+        $(el).find(".btn-mute").hide();
+        $(el).find(".btn-unmute").show();
+      });
+      $(el).on("click", ".btn-unmute", () => {
+        connection.micMuted = false;
+        $(el).find(".btn-unmute").hide();
+        $(el).find(".btn-mute").show();
+      });
+
       $(el).data("rtConnection", connection);
 
       // Set up Shiny-specific event handling
@@ -148,7 +160,11 @@ $.extend(realtimeBinding, {
 
       // Set up message handler for sending events from Shiny
       Shiny.addCustomMessageHandler("realtime_send", (events) => {
-        connection.sendMessages(events);
+        if (Array.isArray(events)) {
+          events.forEach((event) => connection.send(event));
+        } else {
+          connection.send(events);
+        }
       });
 
       return connection;

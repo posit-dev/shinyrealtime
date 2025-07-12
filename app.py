@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import matplotlib as mpl
+import matplotlib.pyplot as plt
 import pandas as pd
 import plotnine as p9
 import seaborn as sns
@@ -25,12 +25,11 @@ prompt += "\n\n# Availble Datasets\n\n" + "\n\n".join(samples)
 
 app_ui = ui.page_fillable(
     realtime_ui("realtime1"),
-    ui.output_plot("plot", fill = True),
-    ui.div(
-        ui.output_code("code_text", placeholder=False),
-        style="height: 300px; max-height: 300px; overflow-y: auto; margin-bottom: 20px;",
+    ui.output_plot("plot", fill=True),
+    ui.output_code("code_text", placeholder=True).add_style(
+        "height: 200px; overflow-y: auto;"
     ),
-    fillable = True,
+    fillable=True,
 )
 
 
@@ -55,7 +54,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         req(last_code())
         print("Plotting:")
         print(last_code())
-        return exec(last_code(), globals())
+        return exec(last_code(), globals(), locals())
 
     @render.code
     def code_text():

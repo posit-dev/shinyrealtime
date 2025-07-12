@@ -27,7 +27,22 @@ def realtime_ui():
     return ui.TagList(
         ui.div(
             dep(),
-            icon_svg("volume-xmark"),
+            ui.panel_fixed(
+                ui.tags.button(
+                    icon_svg("microphone"),
+                    class_="btn btn-secondary btn-sm btn-mute",
+                    style="width: 50px; display: none;",
+                ),
+                ui.tags.button(
+                    icon_svg("microphone-slash"),
+                    class_="btn btn-default btn-sm btn-unmute",
+                    style="width: 50px; display: none;",
+                ),
+                bottom="16px",
+                right="16px",
+                width="auto",
+                class_="text-center",
+            ),
             class_="shinyrealtime",
             id=module.resolve_id("key"),
         ),
