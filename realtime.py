@@ -101,11 +101,14 @@ def realtime_server(
     @output(suspend_when_hidden=False)
     @render.text
     async def key():
+        api_key or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set.")
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 "https://api.openai.com/v1/realtime/sessions",
                 headers={
-                    "Authorization": f"Bearer {api_key or os.getenv('OPENAI_API_KEY')}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
