@@ -134,25 +134,25 @@ def realtime_server(
         try:
             from openai._models import construct_type_unchecked
 
-            event = construct_type_unchecked(
-                value=json.loads(input.key_event()), type_=oair.RealtimeServerEvent
-            )
+            # This is a oair.RealtimeServerEvent but actually using it caused
+            # validation errors all the time
+            event = json.loads(input.key_event())
         except Exception as e:
             print(f"Event: {input.key_event()}")
             print(f"Error processing event: {e}")
             await send_text("The function call you sent was malformed, try again?")
 
         print("-------------")
-        print(event.type)
+        print(event["type"])
         print(input.key_event())
 
         try:
-            if event.type == "response.function_call_arguments.done":
-                fname = event.name
+            if event["type"] == "response.function_call_arguments.done":
+                fname = event["name"]
                 if fname not in tools_by_name:
                     raise ValueError(f"Unknown function: {fname}")
                 tool = tools_by_name[fname]
-                args = json.loads(event.arguments)
+                args = json.loads(event["arguments"])
                 # If the tool is async, we need to await it
                 if asyncio.iscoroutinefunction(tool):
                     _result = await tool(**args)
