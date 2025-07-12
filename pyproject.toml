@@ -8,6 +8,9 @@ dependencies = [
     "aiohttp>=3.12.14",
     "chatlas>=0.9.1",
     "faicons>=0.2.2",
+    "folium>=0.20.0",
+    "great-tables>=0.18.0",
+    "ipyleaflet>=0.20.0",
     "openai>=1.95.0",
     "plotnine>=0.14.6",
     "polars>=1.31.0",
@@ -15,4 +18,5 @@ dependencies = [
     "scikit-learn>=1.7.0",
     "seaborn>=0.13.2",
     "shiny>=1.4.0",
+    "shinywidgets>=0.6.2",
 ]
