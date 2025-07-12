@@ -17,6 +17,7 @@ export async function openConnection(ephemeralKey: string) {
   });
   const micTrack = ms.getTracks()[0];
   pc.addTrack(micTrack);
+  micTrack.enabled = false; // Start with mic muted
 
   // Set up data channel for sending and receiving events
   const dc = pc.createDataChannel("oai-events");
@@ -139,7 +140,7 @@ $.extend(realtimeBinding, {
         connection.close();
       });
 
-      $(el).find(".btn-mute").show();
+      $(el).find(".btn-unmute").show();
       $(el).on("click", ".btn-mute", () => {
         connection.micMuted = true;
         $(el).find(".btn-mute").hide();
