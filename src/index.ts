@@ -141,12 +141,67 @@ $.extend(realtimeBinding, {
       });
 
       $(el).find(".btn-unmute").show();
-      $(el).on("click", ".btn-mute", () => {
+      
+      // Track whether we're in push-to-talk mode
+      let isHoldingMic = false;
+      let holdTimeout: number | null = null;
+      const holdDelay = 200; // ms to differentiate between click and hold
+      
+      // Handle mousedown/touchstart for push-to-talk
+      $(el).on("mousedown touchstart", ".btn-mute, .btn-unmute", function(this: HTMLElement, event: any) {
+        // Clear any existing timeout
+        if (holdTimeout !== null) {
+          clearTimeout(holdTimeout);
+        }
+        
+        // Set a timeout to determine if this is a hold or a click
+        holdTimeout = window.setTimeout(() => {
+          isHoldingMic = true;
+          // Only unmute if we're pressing the unmute button
+          if ($(event.target).closest(".btn-unmute").length > 0) {
+            connection.micMuted = false; // Unmute for push-to-talk
+            $(el).find(".btn-unmute").hide();
+            $(el).find(".btn-mute").show();
+          }
+        }, holdDelay);
+      });
+      
+      // Handle mouseup/touchend for push-to-talk
+      $(document).on("mouseup touchend", function(this: HTMLElement, event: any) {
+        // Clear the timeout if it's still pending
+        if (holdTimeout !== null) {
+          clearTimeout(holdTimeout);
+          holdTimeout = null;
+        }
+        
+        // If we were holding the mic button, handle push-to-talk release
+        if (isHoldingMic) {
+          isHoldingMic = false;
+          // Re-mute the mic when released
+          connection.micMuted = true;
+          $(el).find(".btn-mute").hide();
+          $(el).find(".btn-unmute").show();
+          
+          // Prevent click from firing after a hold
+          event.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Regular click handlers for toggle behavior
+      $(el).on("click", ".btn-mute", function() {
+        // Skip if we're in push-to-talk mode
+        if (isHoldingMic) return;
+        
         connection.micMuted = true;
         $(el).find(".btn-mute").hide();
         $(el).find(".btn-unmute").show();
       });
-      $(el).on("click", ".btn-unmute", () => {
+      
+      $(el).on("click", ".btn-unmute", function() {
+        // Skip if we're in push-to-talk mode
+        if (isHoldingMic) return;
+        
         connection.micMuted = false;
         $(el).find(".btn-unmute").hide();
         $(el).find(".btn-mute").show();
