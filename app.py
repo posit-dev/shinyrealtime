@@ -63,6 +63,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @reactive.effect
     def handle_notifications():
+        """Shows notification when the model is generating code."""
+
         evt = event()
         if evt is None:
             return
@@ -71,7 +73,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             evt["type"] == "conversation.item.created"
             and evt["item"]["type"] == "function_call"
         ):
-            ui.notification_show("Coding...", id=evt["item"]["id"], close_button=False)
+            ui.notification_show(
+                "Generating code, please wait...",
+                id=evt["item"]["id"],
+                close_button=False,
+            )
         elif (
             evt["type"] == "response.output_item.done"
             and evt["item"]["type"] == "function_call"

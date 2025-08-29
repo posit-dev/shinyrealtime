@@ -78,6 +78,7 @@ server <- function(input, output, session) {
     speed = 1.1
   )
 
+  # Show notification when the model is generating code
   observe({
     event <- realtime_controls$event()
     if (
@@ -85,7 +86,7 @@ server <- function(input, output, session) {
         event$item$type == "function_call"
     ) {
       shiny::showNotification(
-        "Coding...",
+        "Generating code, please wait...",
         id = event$item$id,
         closeButton = FALSE
       )
