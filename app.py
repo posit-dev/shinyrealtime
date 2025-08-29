@@ -1,4 +1,6 @@
+import ast
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -24,12 +26,22 @@ for ds in sns.get_dataset_names():
 prompt += "\n\n# Availble Datasets\n\n" + "\n\n".join(samples)
 
 app_ui = ui.page_fillable(
-    realtime_ui("realtime1"),
-    ui.output_plot("plot", fill=True),
-    ui.output_code("code_text", placeholder=True).add_style(
-        "height: 200px; overflow-y: auto;"
+    ui.card(
+        ui.card_header("Plot"),
+        ui.card_body(ui.output_plot("plot", fill=True), padding=0),
+        full_screen=True,
     ),
-    fillable=True,
+    ui.card(
+        ui.card_header("Code"),
+        ui.card_body(ui.output_code("code_text", placeholder=True)),
+        full_screen=True,
+    ),
+    realtime_ui(
+        "realtime1",
+        style="z-index: 100000; margin-left: auto; margin-right: auto;",
+        right=None,
+    ),
+    style="--spacing: 1rem; padding-bottom: 0;",
 )
 
 
@@ -41,25 +53,55 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         last_code.set(code)
 
-    send, send_text = realtime_server(
+    send, send_text, event = realtime_server(
         "realtime1",
-        voice="fable",
+        voice="cedar",
         instructions=prompt,
         tools=[run_python_plot_code],
         speed=1.1,
     )
+
+    @reactive.effect
+    def handle_notifications():
+        evt = event()
+        if evt is None:
+            return
+
+        if (
+            evt["type"] == "conversation.item.created"
+            and evt["item"]["type"] == "function_call"
+        ):
+            ui.notification_show("Coding...", id=evt["item"]["id"], close_button=False)
+        elif (
+            evt["type"] == "response.output_item.done"
+            and evt["item"]["type"] == "function_call"
+        ):
+            ui.notification_remove(id=evt["item"]["id"])
 
     @render.plot
     def plot():
         req(last_code())
         print("Plotting:")
         print(last_code())
-        return exec(last_code(), globals(), locals())
+        return exec_with_return(last_code(), globals(), locals())
 
     @render.code
     def code_text():
         req(last_code())
         return last_code()
 
+def exec_with_return(code: str, globals: dict, locals: dict) -> Any | None:
+    a = ast.parse(code)
+    last_expression = None
+    if a.body:
+        if isinstance(a_last := a.body[-1], ast.Expr):
+            last_expression = ast.unparse(a.body.pop())
+        elif isinstance(a_last, ast.Assign):
+            last_expression = ast.unparse(a_last.targets[0])
+        elif isinstance(a_last, (ast.AnnAssign, ast.AugAssign)):
+            last_expression = ast.unparse(a_last.target)
+    exec(ast.unparse(a), globals, locals)
+    if last_expression:
+        return eval(last_expression, globals, locals)
 
 app = App(app_ui, server, debug=False)

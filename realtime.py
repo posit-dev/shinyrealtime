@@ -23,28 +23,31 @@ def dep() -> HTMLDependency:
 
 
 @module.ui
-def realtime_ui():
+def realtime_ui(*, top=None, right="16px", bottom="16px", left=None, **kwargs):
     return ui.TagList(
         ui.div(
             dep(),
             ui.panel_fixed(
                 ui.tags.button(
                     icon_svg("microphone"),
-                    class_="btn btn-secondary btn-sm btn-mute",
-                    style="width: 50px; display: none;",
+                    class_="btn btn-danger btn btn-mute",
+                    style="width: 80px; display: none;",
                 ),
                 ui.tags.button(
                     icon_svg("microphone-slash"),
-                    class_="btn btn-default btn-sm btn-unmute",
-                    style="width: 50px; display: none;",
+                    class_="btn btn-secondary btn btn-unmute",
+                    style="width: 80px; display: none;",
                 ),
-                bottom="16px",
-                right="16px",
+                top=top,
+                right=right,
+                bottom=bottom,
+                left=left,
                 width="auto",
                 class_="text-center",
             ),
             class_="shinyrealtime",
             id=module.resolve_id("key"),
+            **kwargs,
         ),
         # ui.input_text("msg", "Message"),
         # ui.input_action_button("send", "Send"),
@@ -57,11 +60,12 @@ def realtime_server(
     output: Outputs,
     session: Session,
     *,
-    model: str = "gpt-4o-realtime-preview-2025-06-03",
+    model: str = "gpt-realtime",
     voice: Literal[
         "alloy",
         "ash",
         "ballad",
+        "cedar",
         "coral",
         "echo",
         "fable",
@@ -77,6 +81,7 @@ def realtime_server(
 ):
     api_key = api_key or os.getenv("OPENAI_API_KEY")
     tools_by_name = {tool.__name__: tool for tool in tools}
+    current_event = reactive.value()
 
     @reactive.effect
     @reactive.event(input.send)
@@ -114,6 +119,7 @@ def realtime_server(
                 json={
                     "instructions": instructions,
                     "model": model,
+                    "voice": voice,
                     "turn_detection": {"type": "semantic_vad"},
                     "tools": [
                         chatlas._tools.func_to_schema(tool)["function"]
@@ -128,15 +134,16 @@ def realtime_server(
                     print(data)
                 return data["client_secret"]["value"]
 
-    @reactive.effect
+    @reactive.Effect
     @reactive.event(input.key_event)
-    async def _():
+    async def handle_event():
         try:
             from openai._models import construct_type_unchecked
 
             # This is a oair.RealtimeServerEvent but actually using it caused
             # validation errors all the time
             event = json.loads(input.key_event())
+            current_event.set(event)
         except Exception as e:
             print(f"Event: {input.key_event()}")
             print(f"Error processing event: {e}")
@@ -165,4 +172,4 @@ def realtime_server(
     async def send(*events: dict[str, Any]):
         await session.send_custom_message("realtime_send", events)
 
-    return send, send_text
+    return send, send_text, current_event

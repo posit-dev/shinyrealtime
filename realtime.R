@@ -16,25 +16,35 @@ realtimeDependency <- function() {
 }
 
 # UI Module
-realtimeUI <- function(id) {
+realtimeUI <- function(
+  id,
+  ...,
+  top = NULL,
+  right = "1.5rem",
+  bottom = "1.5rem",
+  left = NULL
+) {
   ns <- NS(id)
 
   tagList(
     div(
+      ...,
       realtimeDependency(),
       fixedPanel(
         tags$button(
           fa_i("microphone"),
-          class = "btn btn-secondary btn-sm btn-mute",
-          style = "width: 50px; display: none;"
+          class = "btn btn-danger btn btn-mute",
+          style = "width: 80px; display: none;"
         ),
         tags$button(
           fa_i("microphone-slash"),
-          class = "btn btn-default btn-sm btn-unmute",
-          style = "width: 50px; display: none;"
+          class = "btn btn-secondary btn btn-unmute",
+          style = "width: 80px; display: none;"
         ),
-        bottom = "16px",
-        right = "16px",
+        top = top,
+        right = right,
+        bottom = bottom,
+        left = left,
         width = "auto",
         class = "text-center"
       ),
@@ -47,7 +57,8 @@ realtimeUI <- function(id) {
 # Server Module
 realtimeServer <- function(
   id,
-  model = "gpt-4o-realtime-preview-2025-06-03",
+  # model = "gpt-4o-realtime-preview-2025-06-03",
+  model = "gpt-realtime",
   voice = "alloy",
   instructions = NULL,
   tools = list(),
@@ -123,6 +134,7 @@ realtimeServer <- function(
             list(
               instructions = instructions,
               model = model,
+              voice = voice,
               turn_detection = list(type = "semantic_vad"),
               tools = tool_schemas
             ),
@@ -144,14 +156,13 @@ realtimeServer <- function(
     observeEvent(input$key_event, {
       tryCatch(
         {
-          event <- fromJSON(input$key_event, simplifyVector = FALSE)
+          event <- evt()
 
           cat("-------------\n")
           cat(event$type, "\n")
           cat(input$key_event, "\n")
 
           if (event$type == "response.function_call_arguments.done") {
-            beepr::beep()
             fname <- event$name
             if (!fname %in% names(tools_by_name)) {
               stop(paste("Unknown function:", fname))
@@ -171,11 +182,15 @@ realtimeServer <- function(
       )
     })
 
+    evt <- reactive({
+      fromJSON(req(input$key_event), simplifyVector = FALSE)
+    })
+
     # Function to send events to the JS
     send <- function(...) {
       session$sendCustomMessage("realtime_send", list(...))
     }
 
-    return(list(send = send, send_text = send_text))
+    return(list(send = send, send_text = send_text, event = evt))
   })
 }

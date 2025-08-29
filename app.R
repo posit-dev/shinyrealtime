@@ -1,5 +1,6 @@
 library(tidyverse)
 library(shiny)
+library(bslib)
 library(dotenv)
 library(ellmer)
 
@@ -32,19 +33,30 @@ prompt <- paste0(
   paste(samples, collapse = "\n\n")
 )
 
-ui <- fillPage(
-  realtimeUI("realtime1"),
-  plotOutput("plot", fill = TRUE),
-  tags$div(
-    style = "height: 200px; overflow-y: auto;",
+ui <- page_fillable(
+  style = "--bslib-spacer: 1rem; padding-bottom: 0;",
+  card(
+    full_screen = TRUE,
+    card_header("Plot"),
+    card_body(padding = 0, plotOutput("plot", fill = TRUE))
+  ),
+  card(
+    full_screen = TRUE,
+    card_header("Code"),
     verbatimTextOutput("code_text")
-  )
+  ),
+  realtimeUI(
+    "realtime1",
+    style = "z-index: 100000; margin-left: auto; margin-right: auto;",
+    right = NULL
+  ),
 )
 
 server <- function(input, output, session) {
   last_code <- reactiveVal()
 
   run_r_plot_code <- function(code) {
+    beepr::beep("shutter.wav")
     last_code(code)
   }
 
@@ -60,11 +72,30 @@ server <- function(input, output, session) {
 
   realtime_controls <- realtimeServer(
     "realtime1",
-    voice = "fable",
+    voice = "cedar",
     instructions = prompt,
     tools = list(run_r_plot_code_tool),
     speed = 1.1
   )
+
+  observe({
+    event <- realtime_controls$event()
+    if (
+      event$type == "conversation.item.created" &&
+        event$item$type == "function_call"
+    ) {
+      shiny::showNotification(
+        "Coding...",
+        id = event$item$id,
+        closeButton = FALSE
+      )
+    } else if (
+      event$type == "response.output_item.done" &&
+        event$item$type == "function_call"
+    ) {
+      shiny::removeNotification(id = event$item$id)
+    }
+  })
 
   output$plot <- renderPlot({
     req(last_code())
