@@ -97,44 +97,56 @@ server <- function(input, output, session) {
     output_modalities = c("text", "audio")
   )
 
-  # Show notification when the model is generating code
-  observe({
-    event <- realtime_controls$event()
-
-    if (
-      event$type == "conversation.item.created" && event$item$type == "message"
-    ) {
+  # Use the new event handling interface with lambda syntax
+  
+  # Handle new messages - clear transcript
+  realtime_controls$on("conversation.item.created", \(event) {
+    if (event$item$type == "message") {
       shinychat::markdown_stream(
         "response_text",
         coro::gen(yield("")),
         operation = "replace",
         session = session
       )
-    } else if (
-      event$type == "conversation.item.created" &&
-        event$item$type == "function_call"
-    ) {
+    }
+  })
+  
+  # Handle function call start - show notification
+  realtime_controls$on("conversation.item.created", \(event) {
+    if (event$item$type == "function_call") {
       shiny::showNotification(
         "Generating code, please wait...",
         id = event$item$id,
         closeButton = FALSE
       )
-    } else if (
-      event$type == "response.output_item.done" &&
-        event$item$type == "function_call"
-    ) {
-      shiny::removeNotification(id = event$item$id)
-    } else if (
-      event$type == "response.text.delta" ||
-        event$type == "response.audio_transcript.delta"
-    ) {
-      shinychat::markdown_stream(
-        "response_text",
-        coro::gen(yield(event$delta)),
-        operation = "append",
-        session = session
-      )
     }
+  })
+  
+  # Handle function call completion - remove notification
+  realtime_controls$on("response.output_item.done", \(event) {
+    if (event$item$type == "function_call") {
+      shiny::removeNotification(id = event$item$id)
+    }
+  })
+  
+  # Handle text streaming
+  realtime_controls$on("response.text.delta", \(event) {
+    shinychat::markdown_stream(
+      "response_text",
+      coro::gen(yield(event$delta)),
+      operation = "append",
+      session = session
+    )
+  })
+  
+  # Handle audio transcript streaming
+  realtime_controls$on("response.audio_transcript.delta", \(event) {
+    shinychat::markdown_stream(
+      "response_text",
+      coro::gen(yield(event$delta)),
+      operation = "append",
+      session = session
+    )
   })
 
   output$plot <- renderPlot({

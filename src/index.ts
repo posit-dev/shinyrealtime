@@ -146,6 +146,7 @@ $.extend(realtimeBinding, {
       let isHoldingMic = false;
       let holdTimeout: number | null = null;
       const holdDelay = 200; // ms to differentiate between click and hold
+      let isSpacebarPressed = false; // Track spacebar state
       
       // Handle mousedown/touchstart for push-to-talk
       $(el).on("mousedown touchstart", ".btn-mute, .btn-unmute", function(this: HTMLElement, event: any) {
@@ -205,6 +206,40 @@ $.extend(realtimeBinding, {
         connection.micMuted = false;
         $(el).find(".btn-unmute").hide();
         $(el).find(".btn-mute").show();
+      });
+      
+      // Add spacebar push-to-talk support
+      $(document).on("keydown", function(event) {
+        // Check if spacebar was pressed (key code 32)
+        if (event.keyCode === 32 && !isSpacebarPressed) {
+          // Prevent default spacebar behavior (like scrolling)
+          if (event.target === document.body) {
+            event.preventDefault();
+          }
+          
+          isSpacebarPressed = true;
+          
+          // Only unmute if currently muted
+          if (connection.micMuted) {
+            connection.micMuted = false;
+            $(el).find(".btn-unmute").hide();
+            $(el).find(".btn-mute").show();
+          }
+        }
+      });
+      
+      $(document).on("keyup", function(event) {
+        // Check if spacebar was released
+        if (event.keyCode === 32) {
+          isSpacebarPressed = false;
+          
+          // Only mute if we're not in mouse push-to-talk mode
+          if (!isHoldingMic) {
+            connection.micMuted = true;
+            $(el).find(".btn-mute").hide();
+            $(el).find(".btn-unmute").show();
+          }
+        }
       });
 
       $(el).data("rtConnection", connection);

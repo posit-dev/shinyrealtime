@@ -4,6 +4,8 @@ library(jsonlite)
 library(httr)
 library(fontawesome)
 
+source("events.R")
+
 # Create an HTMLDependency for the JS/CSS assets
 realtimeDependency <- function() {
   htmlDependency(
@@ -193,6 +195,12 @@ realtimeServer <- function(
       session$sendCustomMessage("realtime_send", list(...))
     }
 
-    return(list(send = send, send_text = send_text, event = evt))
+    # Create return object
+    result <- list(send = send, send_text = send_text, event = evt)
+    
+    # Add event emitter functionality
+    result <- attach_event_emitter(result, evt)
+    
+    return(result)
   })
 }
