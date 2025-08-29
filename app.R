@@ -33,17 +33,26 @@ prompt <- paste0(
   paste(samples, collapse = "\n\n")
 )
 
-ui <- page_fillable(
+ui <- page_sidebar(
+  fillable = TRUE,
   style = "--bslib-spacer: 1rem; padding-bottom: 0;",
-  card(
-    full_screen = TRUE,
-    card_header("Plot"),
-    card_body(padding = 0, plotOutput("plot", fill = TRUE))
+  sidebar = sidebar(
+    title = "Transcript",
+    shinychat::output_markdown_stream("response_text")
   ),
   card(
     full_screen = TRUE,
-    card_header("Code"),
-    verbatimTextOutput("code_text")
+    card_header("Plot"),
+    card_body(padding = 0, plotOutput("plot", fill = TRUE)),
+    height = "66%"
+  ),
+  layout_columns(
+    height = "34%",
+    card(
+      full_screen = TRUE,
+      card_header("Code"),
+      verbatimTextOutput("code_text")
+    )
   ),
   realtimeUI(
     "realtime1",
@@ -54,6 +63,15 @@ ui <- page_fillable(
 
 server <- function(input, output, session) {
   last_code <- reactiveVal()
+
+  greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, or click-and-hold the mic for push-to-talk."
+
+  shinychat::markdown_stream(
+    "response_text",
+    coro::gen(yield(greeting)),
+    operation = "replace",
+    session = session
+  )
 
   run_r_plot_code <- function(code) {
     beepr::beep("shutter.wav")
@@ -75,13 +93,24 @@ server <- function(input, output, session) {
     voice = "cedar",
     instructions = prompt,
     tools = list(run_r_plot_code_tool),
-    speed = 1.1
+    speed = 1.1,
+    output_modalities = c("text", "audio")
   )
 
   # Show notification when the model is generating code
   observe({
     event <- realtime_controls$event()
+
     if (
+      event$type == "conversation.item.created" && event$item$type == "message"
+    ) {
+      shinychat::markdown_stream(
+        "response_text",
+        coro::gen(yield("")),
+        operation = "replace",
+        session = session
+      )
+    } else if (
       event$type == "conversation.item.created" &&
         event$item$type == "function_call"
     ) {
@@ -95,6 +124,16 @@ server <- function(input, output, session) {
         event$item$type == "function_call"
     ) {
       shiny::removeNotification(id = event$item$id)
+    } else if (
+      event$type == "response.text.delta" ||
+        event$type == "response.audio_transcript.delta"
+    ) {
+      shinychat::markdown_stream(
+        "response_text",
+        coro::gen(yield(event$delta)),
+        operation = "append",
+        session = session
+      )
     }
   })
 

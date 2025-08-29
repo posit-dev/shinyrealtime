@@ -59,10 +59,11 @@ realtimeServer <- function(
   id,
   # model = "gpt-4o-realtime-preview-2025-06-03",
   model = "gpt-realtime",
-  voice = "alloy",
-  instructions = NULL,
+  voice = "marin",
+  instructions = "",
   tools = list(),
   api_key = NULL,
+  output_modalities = c("text", "audio"),
   ...
 ) {
   moduleServer(id, function(input, output, session) {
@@ -136,6 +137,7 @@ realtimeServer <- function(
               model = model,
               voice = voice,
               turn_detection = list(type = "semantic_vad"),
+              modalities = I(output_modalities),
               tools = tool_schemas
             ),
             list(...)
