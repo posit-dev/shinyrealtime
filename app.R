@@ -34,14 +34,12 @@ prompt <- paste0(
 )
 
 ui <- page_sidebar(
-  title = "Shiny Realtime Demo",
+  title = "VoicePlot",
   fillable = TRUE,
   style = "--bslib-spacer: 1rem; padding-bottom: 0;",
   sidebar = sidebar(
     title = "Transcript",
-    textOutput("session_cost", container = \(...) {
-      div(class = "help-text", ...)
-    }),
+    helpText(textOutput("session_cost", inline = TRUE)),
     shinychat::output_markdown_stream("response_text")
   ),
   card(
@@ -67,6 +65,7 @@ ui <- page_sidebar(
 
 server <- function(input, output, session) {
   last_code <- reactiveVal()
+  running_cost <- reactiveVal(0) # Cost of tokens used in the session, in dollars
 
   greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, click-and-hold the mic for push-to-talk, or hold the spacebar key for push-to-talk."
 
@@ -101,20 +100,6 @@ server <- function(input, output, session) {
     output_modalities = c("text", "audio")
   )
 
-  # Use the new event handling interface with lambda syntax
-
-  # Handle new messages - clear transcript
-  realtime_controls$on("conversation.item.created", \(event) {
-    if (event$item$type == "message") {
-      shinychat::markdown_stream(
-        "response_text",
-        coro::gen(yield("")),
-        operation = "replace",
-        session = session
-      )
-    }
-  })
-
   # Handle function call start - show notification
   realtime_controls$on("conversation.item.created", \(event) {
     if (event$item$type == "function_call") {
@@ -130,6 +115,18 @@ server <- function(input, output, session) {
   realtime_controls$on("response.output_item.done", \(event) {
     if (event$item$type == "function_call") {
       shiny::removeNotification(id = event$item$id)
+    }
+  })
+
+  # Handle new messages - clear transcript
+  realtime_controls$on("conversation.item.created", \(event) {
+    if (event$item$type == "message") {
+      shinychat::markdown_stream(
+        "response_text",
+        coro::gen(yield("")),
+        operation = "replace",
+        session = session
+      )
     }
   })
 
@@ -187,27 +184,24 @@ server <- function(input, output, session) {
     running_cost(isolate(running_cost()) + cost)
   })
 
-  running_cost <- reactiveVal(0)
   pricing_gpt4_realtime <- c(
-    input_text = 4,
-    input_audio = 32,
-    input_image = 5,
-    input_text_cached = 0.4,
-    input_audio_cached = 0.4,
-    input_image_cached = 0.5,
-    output_text = 16,
-    output_audio = 64
-  ) /
-    1e9
+    input_text = 4 / 1e6,
+    input_audio = 32 / 1e6,
+    input_image = 5 / 1e6,
+    input_text_cached = 0.4 / 1e6,
+    input_audio_cached = 0.4 / 1e6,
+    input_image_cached = 0.5 / 1e6,
+    output_text = 16 / 1e6,
+    output_audio = 64 / 1e6
+  )
   pricing_gpt_4o_mini <- c(
-    input_text = 0.6,
-    input_audio = 10,
-    input_text_cached = 0.3,
-    input_audio_cached = 0.3,
-    output_text = 2.4,
-    output_audio = 20
-  ) /
-    1e9
+    input_text = 0.6 / 1e6,
+    input_audio = 10 / 1e6,
+    input_text_cached = 0.3 / 1e6,
+    input_audio_cached = 0.3 / 1e6,
+    output_text = 2.4 / 1e6,
+    output_audio = 20 / 1e6
+  )
 
   output$plot <- renderPlot({
     req(last_code())
@@ -220,7 +214,7 @@ server <- function(input, output, session) {
   })
 
   output$session_cost <- renderText({
-    paste0(sprintf("Session cost: $%.6f", running_cost()))
+    paste0(sprintf("Session cost: $%.4f", running_cost()))
   })
 }
 

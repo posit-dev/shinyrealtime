@@ -2,6 +2,6 @@
   "version": 3,
   "sources": ["../src/styles.css"],
   "sourcesContent": ["/* Mic toggle button styles */\n.mic-toggle-btn {\n  width: 80px;\n  transition: background-color 0.2s ease;\n}\n\n/* Show/hide mic icon based on state */\n.mic-toggle-btn .mic-on {\n  display: none;\n}\n\n.mic-toggle-btn.active .mic-on {\n  display: inline;\n}\n\n.mic-toggle-btn.active .mic-off {\n  display: none;\n}"],
-  "mappings": ";AACA,CAAC;AACC,SAAO;AACP,cAAY,iBAAiB,KAAK;AACpC;AAGA,CANC,eAMe,CAAC;AACf,WAAS;AACX;AAEA,CAVC,cAUc,CAAC,OAAO,CAJN;AAKf,WAAS;AACX;AAEA,CAdC,cAcc,CAJC,OAIO,CAAC;AACtB,WAAS;AACX;",
+  "mappings": "AACA,CAAC,eACC,MAAO,KACP,WAAY,iBAAiB,IAAK,IACpC,CAGA,CANC,eAMe,CAAC,OACf,QAAS,IACX,CAEA,CAVC,cAUc,CAAC,OAAO,CAJN,OAKf,QAAS,MACX,CAEA,CAdC,cAcc,CAJC,OAIO,CAAC,QACtB,QAAS,IACX",
   "names": []
 }

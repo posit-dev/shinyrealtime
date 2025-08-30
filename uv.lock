@@ -1921,6 +1921,19 @@ wheels = [
 ]
 
 [[package]]
+name = "shinychat"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "htmltools" },
+    { name = "shiny" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2a/0a/84cb2f933d32aa07a1db85332b95f992ad5e05fb85cc5a8d1d4ae362db7b/shinychat-0.1.0.tar.gz", hash = "sha256:9a9134701137544ec8d4025e631cf0dc646cc62d20f2d380d252b9a096d84ef9", size = 517624 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/02/883bc754308db9a939d9ba78948aa47d95047ac12bcff05b491d643e4755/shinychat-0.1.0-py3-none-any.whl", hash = "sha256:ad724760dcfb001c4e47906b87fa9cde074d9a6117bd2b10f372b7d0d651e41c", size = 530517 },
+]
+
+[[package]]
 name = "shinyrealtime"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1935,6 +1948,7 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "shiny" },
+    { name = "shinychat" },
 ]
 
 [package.metadata]
@@ -1949,6 +1963,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = ">=1.4.0" },
+    { name = "shinychat", specifier = ">=0.1.0" },
 ]
 
 [[package]]

@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from typing import Any, Callable, Literal
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Literal, Tuple, Union
 
 import aiohttp
 import chatlas
@@ -10,6 +11,8 @@ from faicons import icon_svg
 from htmltools import HTMLDependency
 from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
+
+from events import EventEmitter
 
 
 def dep() -> HTMLDependency:
@@ -29,14 +32,11 @@ def realtime_ui(*, top=None, right="16px", bottom="16px", left=None, **kwargs):
             dep(),
             ui.panel_fixed(
                 ui.tags.button(
-                    icon_svg("microphone"),
-                    class_="btn btn-danger btn btn-mute",
-                    style="width: 80px; display: none;",
-                ),
-                ui.tags.button(
-                    icon_svg("microphone-slash"),
-                    class_="btn btn-secondary btn btn-unmute",
-                    style="width: 80px; display: none;",
+                    ui.tags.span(icon_svg("microphone"), class_="mic-on"),
+                    ui.tags.span(icon_svg("microphone-slash"), class_="mic-off"),
+                    id=module.resolve_id("mic_button"),
+                    class_="btn btn-secondary mic-toggle-btn",
+                    title="Click to toggle mic, hold for push-to-talk, or use spacebar",
                 ),
                 top=top,
                 right=right,
@@ -69,14 +69,16 @@ def realtime_server(
         "coral",
         "echo",
         "fable",
+        "marin",
         "nova",
         "onyx",
         "sage",
         "shimmer",
-    ] = "alloy",
-    instructions: str | None = None,
+    ] = "marin",
+    instructions: str = "",
     tools: list[Callable[..., Any]] = [],
     api_key: str | None = None,
+    output_modalities: List[str] = ["text", "audio"],
     **kwargs: Any,
 ):
     api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -121,6 +123,7 @@ def realtime_server(
                     "model": model,
                     "voice": voice,
                     "turn_detection": {"type": "semantic_vad"},
+                    "modalities": output_modalities,
                     "tools": [
                         chatlas._tools.func_to_schema(tool)["function"]
                         | {"type": "function"}
@@ -172,4 +175,42 @@ def realtime_server(
     async def send(*events: dict[str, Any]):
         await session.send_custom_message("realtime_send", events)
 
-    return send, send_text, current_event
+    # Create event emitter
+    emitter = EventEmitter()
+
+    # Add on() method to realtime_controls
+    def on(
+        event_type: str,
+    ) -> Callable[[Callable[[dict[str, Any]], None]], Callable[[], None]]:
+        def wrapper(callback: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
+            return emitter.on(event_type, callback)
+
+        return wrapper
+
+    # Handle events from the reactive value
+    @reactive.effect
+    async def _handle_event():
+        event = current_event()
+        if event:
+            await emitter.emit(event["type"], event)
+
+    # Create the return object and attach event emitter functionality
+    realtime_controls = RealtimeControls(
+        send=send,
+        send_text=send_text,
+        current_event=current_event,
+        on=on,
+    )
+
+    return realtime_controls
+
+@dataclass
+class RealtimeControls:
+    send: Callable[
+        [Union[oair.ConversationItemCreateEvent, oair.ResponseCreateEvent]], Any
+    ]
+    send_text: Callable[[str], Any]
+    current_event: reactive.Value
+    on: Callable[
+        [str], Callable[[Callable[[dict[str, Any]], None]], Callable[[], None]]
+    ]

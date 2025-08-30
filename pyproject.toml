@@ -15,4 +15,5 @@ dependencies = [
     "scikit-learn>=1.7.0",
     "seaborn>=0.13.2",
     "shiny>=1.4.0",
+    "shinychat>=0.1.0",
 ]
