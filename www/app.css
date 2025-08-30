@@ -1,1 +1,15 @@
+/* src/styles.css */
+.mic-toggle-btn {
+  width: 80px;
+  transition: background-color 0.2s ease;
+}
+.mic-toggle-btn .mic-on {
+  display: none;
+}
+.mic-toggle-btn.active .mic-on {
+  display: inline;
+}
+.mic-toggle-btn.active .mic-off {
+  display: none;
+}
 /*# sourceMappingURL=app.css.map */

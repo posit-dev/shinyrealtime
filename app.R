@@ -34,10 +34,14 @@ prompt <- paste0(
 )
 
 ui <- page_sidebar(
+  title = "Shiny Realtime Demo",
   fillable = TRUE,
   style = "--bslib-spacer: 1rem; padding-bottom: 0;",
   sidebar = sidebar(
     title = "Transcript",
+    textOutput("session_cost", container = \(...) {
+      div(class = "help-text", ...)
+    }),
     shinychat::output_markdown_stream("response_text")
   ),
   card(
@@ -64,7 +68,7 @@ ui <- page_sidebar(
 server <- function(input, output, session) {
   last_code <- reactiveVal()
 
-  greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, or click-and-hold the mic for push-to-talk."
+  greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, click-and-hold the mic for push-to-talk, or hold the spacebar key for push-to-talk."
 
   shinychat::markdown_stream(
     "response_text",
@@ -98,7 +102,7 @@ server <- function(input, output, session) {
   )
 
   # Use the new event handling interface with lambda syntax
-  
+
   # Handle new messages - clear transcript
   realtime_controls$on("conversation.item.created", \(event) {
     if (event$item$type == "message") {
@@ -110,7 +114,7 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   # Handle function call start - show notification
   realtime_controls$on("conversation.item.created", \(event) {
     if (event$item$type == "function_call") {
@@ -121,14 +125,14 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   # Handle function call completion - remove notification
   realtime_controls$on("response.output_item.done", \(event) {
     if (event$item$type == "function_call") {
       shiny::removeNotification(id = event$item$id)
     }
   })
-  
+
   # Handle text streaming
   realtime_controls$on("response.text.delta", \(event) {
     shinychat::markdown_stream(
@@ -138,7 +142,7 @@ server <- function(input, output, session) {
       session = session
     )
   })
-  
+
   # Handle audio transcript streaming
   realtime_controls$on("response.audio_transcript.delta", \(event) {
     shinychat::markdown_stream(
@@ -149,16 +153,74 @@ server <- function(input, output, session) {
     )
   })
 
+  realtime_controls$on("response.done", \(event) {
+    # "usage": {
+    #   "total_tokens": 1977,
+    #   "input_tokens": 1687,
+    #   "output_tokens": 290,
+    #   "input_token_details": {
+    #     "text_tokens": 1636,
+    #     "audio_tokens": 51,
+    #     "image_tokens": 0,
+    #     "cached_tokens": 1600,
+    #     "cached_tokens_details": {
+    #       "text_tokens": 1600,
+    #       "audio_tokens": 0,
+    #       "image_tokens": 0
+    #     }
+    #   },
+    #   "output_token_details": { "text_tokens": 68, "audio_tokens": 222 }
+    # }
+    usage <- event$response$usage
+    current_response <- c(
+      input_text = usage$input_token_details$text_tokens,
+      input_audio = usage$input_token_details$audio_tokens,
+      input_image = usage$input_token_details$image_tokens,
+      input_text_cached = usage$input_token_details$cached_tokens_details$text_tokens,
+      input_audio_cached = usage$input_token_details$cached_tokens_details$audio_tokens,
+      input_image_cached = usage$input_token_details$cached_tokens_details$image_tokens,
+      output_text = usage$output_token_details$text_tokens,
+      output_audio = usage$output_token_details$audio_tokens
+    )
+
+    cost <- sum(current_response * pricing_gpt4_realtime)
+    running_cost(isolate(running_cost()) + cost)
+  })
+
+  running_cost <- reactiveVal(0)
+  pricing_gpt4_realtime <- c(
+    input_text = 4,
+    input_audio = 32,
+    input_image = 5,
+    input_text_cached = 0.4,
+    input_audio_cached = 0.4,
+    input_image_cached = 0.5,
+    output_text = 16,
+    output_audio = 64
+  ) /
+    1e9
+  pricing_gpt_4o_mini <- c(
+    input_text = 0.6,
+    input_audio = 10,
+    input_text_cached = 0.3,
+    input_audio_cached = 0.3,
+    output_text = 2.4,
+    output_audio = 20
+  ) /
+    1e9
+
   output$plot <- renderPlot({
     req(last_code())
-    print("Plotting:")
-    print(last_code())
     eval(parse(text = last_code()))
   })
 
   output$code_text <- renderText({
     req(last_code())
     last_code()
+  })
+
+  output$session_cost <- renderText({
+    paste0(sprintf("Session cost: $%.6f", running_cost()))
   })
 }
 

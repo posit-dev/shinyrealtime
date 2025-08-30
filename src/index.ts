@@ -1,4 +1,5 @@
 import "./binding";
+import { MicButton } from "./MicButton";
 import "./styles.css";
 
 export async function openConnection(ephemeralKey: string) {
@@ -140,105 +141,22 @@ $.extend(realtimeBinding, {
         connection.close();
       });
 
-      $(el).find(".btn-unmute").show();
-      
-      // Track whether we're in push-to-talk mode
-      let isHoldingMic = false;
-      let holdTimeout: number | null = null;
-      const holdDelay = 200; // ms to differentiate between click and hold
-      let isSpacebarPressed = false; // Track spacebar state
-      
-      // Handle mousedown/touchstart for push-to-talk
-      $(el).on("mousedown touchstart", ".btn-mute, .btn-unmute", function(this: HTMLElement, event: any) {
-        // Clear any existing timeout
-        if (holdTimeout !== null) {
-          clearTimeout(holdTimeout);
-        }
-        
-        // Set a timeout to determine if this is a hold or a click
-        holdTimeout = window.setTimeout(() => {
-          isHoldingMic = true;
-          // Only unmute if we're pressing the unmute button
-          if ($(event.target).closest(".btn-unmute").length > 0) {
-            connection.micMuted = false; // Unmute for push-to-talk
-            $(el).find(".btn-unmute").hide();
-            $(el).find(".btn-mute").show();
-          }
-        }, holdDelay);
-      });
-      
-      // Handle mouseup/touchend for push-to-talk
-      $(document).on("mouseup touchend", function(this: HTMLElement, event: any) {
-        // Clear the timeout if it's still pending
-        if (holdTimeout !== null) {
-          clearTimeout(holdTimeout);
-          holdTimeout = null;
-        }
-        
-        // If we were holding the mic button, handle push-to-talk release
-        if (isHoldingMic) {
-          isHoldingMic = false;
-          // Re-mute the mic when released
-          connection.micMuted = true;
-          $(el).find(".btn-mute").hide();
-          $(el).find(".btn-unmute").show();
-          
-          // Prevent click from firing after a hold
-          event.stopPropagation();
-          return false;
-        }
-      });
-      
-      // Regular click handlers for toggle behavior
-      $(el).on("click", ".btn-mute", function() {
-        // Skip if we're in push-to-talk mode
-        if (isHoldingMic) return;
-        
-        connection.micMuted = true;
-        $(el).find(".btn-mute").hide();
-        $(el).find(".btn-unmute").show();
-      });
-      
-      $(el).on("click", ".btn-unmute", function() {
-        // Skip if we're in push-to-talk mode
-        if (isHoldingMic) return;
-        
-        connection.micMuted = false;
-        $(el).find(".btn-unmute").hide();
-        $(el).find(".btn-mute").show();
-      });
-      
-      // Add spacebar push-to-talk support
-      $(document).on("keydown", function(event) {
-        // Check if spacebar was pressed (key code 32)
-        if (event.keyCode === 32 && !isSpacebarPressed) {
-          // Prevent default spacebar behavior (like scrolling)
-          if (event.target === document.body) {
-            event.preventDefault();
-          }
-          
-          isSpacebarPressed = true;
-          
-          // Only unmute if currently muted
-          if (connection.micMuted) {
-            connection.micMuted = false;
-            $(el).find(".btn-unmute").hide();
-            $(el).find(".btn-mute").show();
-          }
-        }
-      });
-      
-      $(document).on("keyup", function(event) {
-        // Check if spacebar was released
-        if (event.keyCode === 32) {
-          isSpacebarPressed = false;
-          
-          // Only mute if we're not in mouse push-to-talk mode
-          if (!isHoldingMic) {
-            connection.micMuted = true;
-            $(el).find(".btn-mute").hide();
-            $(el).find(".btn-unmute").show();
-          }
+      // MicButton implementation has been moved to MicButton.ts
+
+      // Create the mic button controller
+      const micButtonElement = el.querySelector(
+        ".mic-toggle-btn"
+      ) as HTMLElement;
+      const micButton = new MicButton(micButtonElement, (muted: boolean) => {
+        // This is our callback when mic state changes
+        connection.micMuted = muted;
+
+        if (muted) {
+          micButtonElement.classList.remove("active", "btn-danger");
+          micButtonElement.classList.add("btn-secondary");
+        } else {
+          micButtonElement.classList.remove("btn-secondary");
+          micButtonElement.classList.add("active", "btn-danger");
         }
       });
 

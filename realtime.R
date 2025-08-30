@@ -34,14 +34,11 @@ realtimeUI <- function(
       realtimeDependency(),
       fixedPanel(
         tags$button(
-          fa_i("microphone"),
-          class = "btn btn-danger btn btn-mute",
-          style = "width: 80px; display: none;"
-        ),
-        tags$button(
-          fa_i("microphone-slash"),
-          class = "btn btn-secondary btn btn-unmute",
-          style = "width: 80px; display: none;"
+          id = ns("mic_button"),
+          span(fa_i("microphone"), class = "mic-on"),
+          span(fa_i("microphone-slash"), class = "mic-off"),
+          class = "btn btn-secondary mic-toggle-btn",
+          title = "Click to toggle mic, hold for push-to-talk, or use spacebar"
         ),
         top = top,
         right = right,
