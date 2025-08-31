@@ -59,10 +59,10 @@ realtimeServer <- function(
   # model = "gpt-4o-realtime-preview-2025-06-03",
   model = "gpt-realtime",
   voice = "marin",
+  speed = 1.0,
   instructions = "",
   tools = list(),
   api_key = NULL,
-  output_modalities = c("text", "audio"),
   ...
 ) {
   moduleServer(id, function(input, output, session) {
@@ -124,7 +124,7 @@ realtimeServer <- function(
 
       # Create the session
       res <- POST(
-        url = "https://api.openai.com/v1/realtime/sessions",
+        url = "https://api.openai.com/v1/realtime/client_secrets",
         add_headers(
           Authorization = paste("Bearer", api_key),
           "Content-Type" = "application/json"
@@ -132,12 +132,22 @@ realtimeServer <- function(
         body = req_body <<- toJSON(
           c(
             list(
-              instructions = instructions,
-              model = model,
-              voice = voice,
-              turn_detection = list(type = "semantic_vad"),
-              modalities = I(output_modalities),
-              tools = tool_schemas
+              session = list(
+                type = "realtime",
+                model = model,
+                instructions = instructions,
+                audio = list(
+                  input = list(
+                    # TODO: Consider turning off detection when push-to-talk is used
+                    turn_detection = list(type = "semantic_vad")
+                  ),
+                  output = list(
+                    voice = voice,
+                    speed = speed
+                  )
+                ),
+                tools = tool_schemas
+              )
             ),
             list(...)
           ),
@@ -147,10 +157,8 @@ realtimeServer <- function(
       )
 
       data <- content(res)
-      if (!("client_secret" %in% names(data))) {
-        print(data)
-      }
-      return(data$client_secret$value)
+      # print(data)
+      return(data$value)
     })
 
     # Handle key events
@@ -194,10 +202,10 @@ realtimeServer <- function(
 
     # Create return object
     result <- list(send = send, send_text = send_text, event = evt)
-    
+
     # Add event emitter functionality
     result <- attach_event_emitter(result, evt)
-    
+
     return(result)
   })
 }

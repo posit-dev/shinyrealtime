@@ -75,10 +75,10 @@ def realtime_server(
         "sage",
         "shimmer",
     ] = "marin",
+    speed: float = 1.0,
     instructions: str = "",
     tools: list[Callable[..., Any]] = [],
     api_key: str | None = None,
-    output_modalities: List[str] = ["text", "audio"],
     **kwargs: Any,
 ):
     api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -113,29 +113,38 @@ def realtime_server(
             raise ValueError("OPENAI_API_KEY environment variable is not set.")
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.openai.com/v1/realtime/sessions",
+                "https://api.openai.com/v1/realtime/client_secrets",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "instructions": instructions,
-                    "model": model,
-                    "voice": voice,
-                    "turn_detection": {"type": "semantic_vad"},
-                    "modalities": output_modalities,
-                    "tools": [
-                        chatlas._tools.func_to_schema(tool)["function"]
-                        | {"type": "function"}
-                        for tool in tools
-                    ],
+                    "session": {
+                        "type": "realtime",
+                        "model": model,
+                        "instructions": instructions,
+                        "audio": {
+                            "input": {
+                                # TODO: Consider turning off detection when push-to-talk is used
+                                "turn_detection": {"type": "semantic_vad"}
+                            },
+                            "output": {
+                                "voice": voice,
+                                "speed": speed
+                            }
+                        },
+                        "tools": [
+                            chatlas._tools.func_to_schema(tool)["function"]
+                            | {"type": "function"}
+                            for tool in tools
+                        ]
+                    }
                 }
                 | kwargs,
             ) as response:
                 data = await response.json()
-                if "client_secret" not in data:
-                    print(data)
-                return data["client_secret"]["value"]
+                # print(data)
+                return data["value"]
 
     @reactive.Effect
     @reactive.event(input.key_event)

@@ -1,5 +1,6 @@
 library(tidyverse)
 library(shiny)
+library(shinychat)
 library(bslib)
 library(dotenv)
 library(ellmer)
@@ -40,7 +41,7 @@ ui <- page_sidebar(
   sidebar = sidebar(
     title = "Transcript",
     helpText(textOutput("session_cost", inline = TRUE)),
-    shinychat::output_markdown_stream("response_text")
+    output_markdown_stream("response_text")
   ),
   card(
     full_screen = TRUE,
@@ -69,12 +70,16 @@ server <- function(input, output, session) {
 
   greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, click-and-hold the mic for push-to-talk, or hold the spacebar key for push-to-talk."
 
-  shinychat::markdown_stream(
-    "response_text",
-    coro::gen(yield(greeting)),
-    operation = "replace",
-    session = session
-  )
+  append_transcript <- function(text, clear = FALSE) {
+    markdown_stream(
+      "response_text",
+      coro::gen(yield(text)),
+      operation = if (clear) "replace" else "append",
+      session = session
+    )
+  }
+
+  append_transcript(greeting, clear = TRUE)
 
   run_r_plot_code <- function(code) {
     beepr::beep("shutter.wav")
@@ -96,8 +101,7 @@ server <- function(input, output, session) {
     voice = "cedar",
     instructions = prompt,
     tools = list(run_r_plot_code_tool),
-    speed = 1.1,
-    output_modalities = c("text", "audio")
+    speed = 1.1
   )
 
   # Handle function call start - show notification
@@ -119,35 +123,13 @@ server <- function(input, output, session) {
   })
 
   # Handle new messages - clear transcript
-  realtime_controls$on("conversation.item.created", \(event) {
-    if (event$item$type == "message") {
-      shinychat::markdown_stream(
-        "response_text",
-        coro::gen(yield("")),
-        operation = "replace",
-        session = session
-      )
-    }
+  realtime_controls$on("response.created", \(event) {
+    append_transcript("", clear = TRUE)
   })
 
   # Handle text streaming
-  realtime_controls$on("response.text.delta", \(event) {
-    shinychat::markdown_stream(
-      "response_text",
-      coro::gen(yield(event$delta)),
-      operation = "append",
-      session = session
-    )
-  })
-
-  # Handle audio transcript streaming
-  realtime_controls$on("response.audio_transcript.delta", \(event) {
-    shinychat::markdown_stream(
-      "response_text",
-      coro::gen(yield(event$delta)),
-      operation = "append",
-      session = session
-    )
+  realtime_controls$on("response.output_audio_transcript.delta", \(event) {
+    append_transcript(event$delta)
   })
 
   realtime_controls$on("response.done", \(event) {

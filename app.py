@@ -155,20 +155,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         with reactive.isolate():
             running_cost.set(running_cost() + cost)
 
-    @realtime_controls.on("conversation.item.created")
+    @realtime_controls.on("response.created")
     async def _clear_transcript(event: Dict[str, Any]):
-        "Clear the transcript when a new conversation starts"
+        "Clear the transcript when a new response starts"
 
-        print("GOT HERE 1")
-        if event["item"]["type"] == "message":
-            await response_text.stream([""], clear=True)
+        await response_text.stream([""], clear=True)
 
-    @realtime_controls.on("response.audio_transcript.delta")
+    @realtime_controls.on("response.output_audio_transcript.delta")
     async def _stream_text_to_transcript(event: Dict[str, Any]):
         "Stream text deltas to the transcript"
 
-        print("GOT HERE 2")
-        print(event["delta"])
         await response_text.stream([event["delta"]], clear=False)
 
     # == Outputs ===============================================================
