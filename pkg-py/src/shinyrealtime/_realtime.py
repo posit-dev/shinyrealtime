@@ -12,14 +12,20 @@ from htmltools import HTMLDependency
 from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
-from events import EventEmitter
+from ._events import EventEmitter
 
 
 def dep() -> HTMLDependency:
+    """
+    Creates an HTMLDependency for the JS/CSS assets.
+    
+    Returns:
+        HTMLDependency: The dependency object
+    """
     return HTMLDependency(
         name="shinyrealtime",
         version="0.1.0",
-        source={"subdir": "www"},
+        source={"package": "shinyrealtime", "subdir": "www"},
         script=[{"src": "app.js"}],
         stylesheet=[{"href": "app.css"}],
     )
@@ -27,6 +33,19 @@ def dep() -> HTMLDependency:
 
 @module.ui
 def realtime_ui(*, top=None, right="16px", bottom="16px", left=None, **kwargs):
+    """
+    Creates the UI components for real-time interactions.
+    
+    Args:
+        top: Top position for the microphone button
+        right: Right position for the microphone button
+        bottom: Bottom position for the microphone button
+        left: Left position for the microphone button
+        **kwargs: Additional parameters to pass to the div element
+        
+    Returns:
+        ui.TagList: A UI definition that can be used in a Shiny app
+    """
     return ui.TagList(
         ui.div(
             dep(),
@@ -49,8 +68,6 @@ def realtime_ui(*, top=None, right="16px", bottom="16px", left=None, **kwargs):
             id=module.resolve_id("key"),
             **kwargs,
         ),
-        # ui.input_text("msg", "Message"),
-        # ui.input_action_button("send", "Send"),
     )
 
 
@@ -81,6 +98,24 @@ def realtime_server(
     api_key: str | None = None,
     **kwargs: Any,
 ):
+    """
+    Creates the server-side logic for handling real-time interactions.
+    
+    Args:
+        input: Shiny inputs
+        output: Shiny outputs
+        session: Shiny session
+        model: The OpenAI model to use for real-time interactions
+        voice: The voice to use for audio output
+        speed: The speaking speed for audio output
+        instructions: System instructions for the AI model
+        tools: List of tools/functions that the AI can call
+        api_key: OpenAI API key (optional, defaults to OPENAI_API_KEY environment variable)
+        **kwargs: Additional parameters to pass to the OpenAI API
+        
+    Returns:
+        RealtimeControls: An object for controlling the real-time interaction
+    """
     api_key = api_key or os.getenv("OPENAI_API_KEY")
     tools_by_name = {tool.__name__: tool for tool in tools}
     current_event = reactive.value()
@@ -88,9 +123,15 @@ def realtime_server(
     @reactive.effect
     @reactive.event(input.send)
     async def send_message():
-        send_text(input.msg())
+        await send_text(input.msg())
 
     async def send_text(text: str):
+        """
+        Sends a text message to the AI.
+        
+        Args:
+            text: The text to send
+        """
         await send(
             oair.ConversationItemCreateEvent(
                 item=oair.ConversationItem(
@@ -109,6 +150,12 @@ def realtime_server(
     @output(suspend_when_hidden=False)
     @render.text
     async def key():
+        """
+        Generates the client secret from OpenAI.
+        
+        Returns:
+            str: The client secret
+        """
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set.")
         async with aiohttp.ClientSession() as session:
@@ -143,12 +190,14 @@ def realtime_server(
                 | kwargs,
             ) as response:
                 data = await response.json()
-                # print(data)
                 return data["value"]
 
     @reactive.Effect
     @reactive.event(input.key_event)
     async def handle_event():
+        """
+        Handles events from the client.
+        """
         try:
             from openai._models import construct_type_unchecked
 
@@ -182,6 +231,12 @@ def realtime_server(
             await send_text(f"Error processing function call: {e}")
 
     async def send(*events: dict[str, Any]):
+        """
+        Sends events to the client.
+        
+        Args:
+            *events: Events to send
+        """
         await session.send_custom_message("realtime_send", events)
 
     # Create event emitter
@@ -191,6 +246,16 @@ def realtime_server(
     def on(
         event_type: str,
     ) -> Callable[[Callable[[dict[str, Any]], None]], Callable[[], None]]:
+        """
+        Decorator that registers a handler for an event type.
+
+        Args:
+            event_type: The type of event to listen for
+
+        Returns:
+            Callable: A decorator for the callback function. When invoked, the
+            decorator returns an unsubscribe function.
+        """
         def wrapper(callback: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
             return emitter.on(event_type, callback)
 
@@ -215,6 +280,15 @@ def realtime_server(
 
 @dataclass
 class RealtimeControls:
+    """
+    An object for controlling the real-time interaction.
+    
+    Attributes:
+        send: Function to send events to the client
+        send_text: Function to send text messages to the AI
+        current_event: Reactive value containing the current event
+        on: Function to register event handlers
+    """
     send: Callable[
         [Union[oair.ConversationItemCreateEvent, oair.ResponseCreateEvent]], Any
     ]

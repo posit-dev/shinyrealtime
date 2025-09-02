@@ -1,4 +1,5 @@
 import ast
+import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
@@ -9,8 +10,7 @@ import seaborn as sns
 import shinychat
 from dotenv import load_dotenv
 from shiny import App, Inputs, Outputs, Session, module, reactive, render, req, ui
-
-from realtime import realtime_server, realtime_ui
+from shinyrealtime import realtime_server, realtime_ui
 
 load_dotenv()
 
@@ -105,7 +105,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # == Handle realtime events ================================================
 
-    @realtime_controls.on("conversation.item.created")
+    @realtime_controls.on("conversation.item.added")
     async def _show_coding_progress(event: dict[str, Any]):
         "Add notifications when function calls start"
 
@@ -116,7 +116,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 close_button=False,
             )
 
-    @realtime_controls.on("response.output_item.done")
+    @realtime_controls.on("conversation.item.done")
     async def _hide_coding_progress(event: dict[str, Any]):
         "Remove notifications when function calls complete"
 
@@ -168,11 +168,30 @@ def server(input: Inputs, output: Outputs, session: Session):
         await response_text.stream([event["delta"]], clear=False)
 
     # == Outputs ===============================================================
-
     @render.plot
     def plot():
         req(last_code())
-        return exec_with_return(last_code(), globals(), locals())
+        result = exec_with_return(last_code(), globals(), locals())
+
+        # Play shutter sound
+        # TODO: Make this work on Windows, Linux, etc.
+        # Play shutter sound
+        import platform
+
+        if platform.system() == "Windows":
+            subprocess.Popen(
+                [
+                    "powershell",
+                    "-c",
+                    "(New-Object Media.SoundPlayer 'shutter.mp3').PlaySync()",
+                ]
+            )
+        elif platform.system() == "Darwin":
+            subprocess.Popen(["afplay", "shutter.mp3"])
+        elif platform.system() == "Linux":
+            subprocess.Popen(["aplay", "shutter.mp3"])
+
+        return result
 
     @render.code
     def code_text():

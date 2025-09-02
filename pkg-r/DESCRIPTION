@@ -1,0 +1,24 @@
+Package: shinyrealtime
+Title: Real-Time Shiny Interface for OpenAI's Real-Time API
+Version: 0.1.0
+Authors@R: 
+    person("Joe", "Cheng", , "joe@posit.co", role = c("aut", "cre"))
+Description: Provides real-time audio and text interfaces for Shiny applications
+    using OpenAI's real-time API. Enables voice input, text streaming, and tool 
+    calling functionality in both R and Python Shiny apps.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    ellmer,
+    fontawesome,
+    htmltools,
+    httr,
+    jsonlite,
+    shiny,
+    R6,
+    S7
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

@@ -1,24 +1,39 @@
-library(shiny)
-library(htmltools)
-library(jsonlite)
-library(httr)
-library(fontawesome)
+#' @import shiny
+#' @import htmltools
+#' @importFrom jsonlite toJSON fromJSON
+#' @importFrom httr POST add_headers content
+#' @importFrom fontawesome fa_i
+#' @importFrom R6 R6Class
+NULL
 
-source("events.R")
-
-# Create an HTMLDependency for the JS/CSS assets
+#' Create an HTMLDependency for the JS/CSS assets
+#'
+#' @return An HTML dependency object that provides the necessary JavaScript and CSS files
+#' @export
 realtimeDependency <- function() {
   htmlDependency(
     name = "shinyrealtime",
     version = "0.1.0",
-    src = list(file = "www"),
+    src = list(file = system.file("www", package = "shinyrealtime")),
     script = "app.js",
     stylesheet = "app.css"
   )
 }
 
-# UI Module
-realtimeUI <- function(
+#' UI Module for real-time interactions
+#'
+#' Creates the UI components needed for real-time voice and text interactions
+#'
+#' @param id The module ID
+#' @param ... Additional UI elements to include
+#' @param top Top position for the microphone button
+#' @param right Right position for the microphone button
+#' @param bottom Bottom position for the microphone button
+#' @param left Left position for the microphone button
+#'
+#' @return A UI definition that can be used in a Shiny app
+#' @export
+realtime_ui <- function(
   id,
   ...,
   top = NULL,
@@ -53,8 +68,22 @@ realtimeUI <- function(
   )
 }
 
-# Server Module
-realtimeServer <- function(
+#' Server Module for real-time interactions
+#'
+#' Creates the server-side logic for handling real-time voice and text interactions
+#'
+#' @param id The module ID
+#' @param model The OpenAI model to use for real-time interactions
+#' @param voice The voice to use for audio output
+#' @param speed The speaking speed for audio output
+#' @param instructions System instructions for the AI model
+#' @param tools List of tools/functions that the AI can call
+#' @param api_key OpenAI API key (optional, defaults to OPENAI_API_KEY environment variable)
+#' @param ... Additional parameters to pass to the OpenAI API
+#'
+#' @return A list of reactive objects for controlling the real-time interaction
+#' @export
+realtime_server <- function(
   id,
   # model = "gpt-4o-realtime-preview-2025-06-03",
   model = "gpt-realtime",
@@ -108,7 +137,7 @@ realtimeServer <- function(
         stop("OPENAI_API_KEY environment variable is not set.")
       }
 
-      provider <- chat_openai(model = "gpt-4.1-nano")$get_provider()
+      provider <- ellmer::chat_openai()$get_provider()
       # Prepare tools for API request
       tool_schemas <- lapply(
         tools,
@@ -129,7 +158,7 @@ realtimeServer <- function(
           Authorization = paste("Bearer", api_key),
           "Content-Type" = "application/json"
         ),
-        body = req_body <<- toJSON(
+        body = toJSON(
           c(
             list(
               session = list(
@@ -157,7 +186,6 @@ realtimeServer <- function(
       )
 
       data <- content(res)
-      # print(data)
       return(data$value)
     })
 

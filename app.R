@@ -1,11 +1,11 @@
-library(tidyverse)
-library(shiny)
-library(shinychat)
 library(bslib)
 library(dotenv)
 library(ellmer)
+library(shiny)
+library(shinychat)
+library(shinyrealtime)
+library(tidyverse)
 
-source("realtime.R")
 
 # Read prompt file
 prompt <- readLines("prompt-r.md") |> paste(collapse = "\n")
@@ -39,8 +39,7 @@ ui <- page_sidebar(
   fillable = TRUE,
   style = "--bslib-spacer: 1rem; padding-bottom: 0;",
   sidebar = sidebar(
-    title = "Transcript",
-    helpText(textOutput("session_cost", inline = TRUE)),
+    helpText("Session cost:", textOutput("session_cost", inline = TRUE)),
     output_markdown_stream("response_text")
   ),
   card(
@@ -57,7 +56,7 @@ ui <- page_sidebar(
       verbatimTextOutput("code_text")
     )
   ),
-  realtimeUI(
+  realtime_ui(
     "realtime1",
     style = "z-index: 100000; margin-left: auto; margin-right: auto;",
     right = NULL
@@ -96,7 +95,7 @@ server <- function(input, output, session) {
     )
   )
 
-  realtime_controls <- realtimeServer(
+  realtime_controls <- realtime_server(
     "realtime1",
     voice = "cedar",
     instructions = prompt,
@@ -105,7 +104,7 @@ server <- function(input, output, session) {
   )
 
   # Handle function call start - show notification
-  realtime_controls$on("conversation.item.created", \(event) {
+  realtime_controls$on("conversation.item.added", \(event) {
     if (event$item$type == "function_call") {
       shiny::showNotification(
         "Generating code, please wait...",
@@ -116,7 +115,7 @@ server <- function(input, output, session) {
   })
 
   # Handle function call completion - remove notification
-  realtime_controls$on("response.output_item.done", \(event) {
+  realtime_controls$on("conversation.item.done", \(event) {
     if (event$item$type == "function_call") {
       shiny::removeNotification(id = event$item$id)
     }
@@ -196,7 +195,7 @@ server <- function(input, output, session) {
   })
 
   output$session_cost <- renderText({
-    paste0(sprintf("Session cost: $%.4f", running_cost()))
+    paste0(sprintf("$%.4f", running_cost()))
   })
 }
 

@@ -107,7 +107,7 @@ EventEmitter <- R6::R6Class(
   )
 )
 
-# Function to integrate the EventEmitter with realtimeServer
+# Function to integrate the EventEmitter with realtime_server
 # This should be called from realtime.R
 attach_event_emitter <- function(realtime_controls, evt) {
   # Create event emitter

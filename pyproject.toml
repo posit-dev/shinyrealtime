@@ -1,19 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "shinyrealtime"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "aiohttp>=3.12.14",
-    "chatlas>=0.9.1",
-    "faicons>=0.2.2",
-    "openai>=1.95.0",
-    "plotnine>=0.14.6",
-    "polars>=1.31.0",
-    "python-dotenv>=1.1.1",
-    "scikit-learn>=1.7.0",
-    "seaborn>=0.13.2",
-    "shiny>=1.4.0",
-    "shinychat>=0.1.0",
+description = "Real-Time Shiny Interface for OpenAI's Real-Time API"
+readme = "pkg-py/README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Joe Cheng", email = "joe@posit.co" }
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "shiny>=0.6.0",
+    "htmltools>=0.2.1",
+    "openai>=1.13.0",
+    "aiohttp>=3.8.0",
+    "faicons>=0.2.1",
+    "pydantic>=2.0.0",
+    "chatlas>=0.4.0"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/jcheng5/shinyrealtime"
+"Bug Tracker" = "https://github.com/jcheng5/shinyrealtime/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "aiohttp>=3.12.14",
+    "python-dotenv>=1.1.1",
+]
+
+[tool.hatch.build]
+skip-excluded-dirs = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["pkg-py/src/shinyrealtime"]
+include = ["py.typed"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/pkg-py/src/shinyrealtime"]
+
+[tool.pytest.ini_options]
+testpaths = ["pkg-py/tests"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
