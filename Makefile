@@ -18,6 +18,7 @@ build-r: js
 	cd pkg-r && R CMD build .
 
 build-py: js
+	uv sync
 	mkdir -p pkg-py/src/shinyrealtime/www
 	cp www/app.js pkg-py/src/shinyrealtime/www/
 	cp www/app.css pkg-py/src/shinyrealtime/www/
