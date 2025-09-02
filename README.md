@@ -58,6 +58,8 @@ Rscript app.R
 shiny run app.py --launch-browser
 ```
 
+**Note that for security reasons, these demo apps (and any shinyrealtime apps) will NOT work when the UI is loaded in an IDE like RStudio, Positron, or VS Code (as these IDEs do not allow iframes to access microphones). You must open the app a real web browser.**
+
 ## License
 
 MIT
