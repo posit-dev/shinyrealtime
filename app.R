@@ -3,7 +3,8 @@ library(ellmer)
 library(shiny)
 library(shinychat)
 library(shinyrealtime)
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
 
 
 # Read prompt file

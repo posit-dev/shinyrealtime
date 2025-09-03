@@ -30,7 +30,8 @@ other conversation that is not related to generating plots.
 In your R code, you can assume the following imports have already been made:
 
 ```r
-library(tidyverse)
+library(ggplot2)
+library(dplyr)
 ```
 
 Speak only English.
