@@ -34,6 +34,8 @@ library(ggplot2)
 library(dplyr)
 ```
 
+Don't change the theme or set any plot colours unless the user explicitly asks for it.
+
 Speak only English.
 
 Some built-in datasets are loaded under the following variable names:
