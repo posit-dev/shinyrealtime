@@ -4,7 +4,8 @@ library(ellmer)
 library(shiny)
 library(shinychat)
 library(shinyrealtime)
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
 
 
 # Read prompt file
@@ -184,7 +185,7 @@ server <- function(input, output, session) {
     output_audio = 20 / 1e6
   )
 
-  output$plot <- renderPlot({
+  output$plot <- renderPlot(res = 96, {
     req(last_code())
     eval(parse(text = last_code()))
   })
