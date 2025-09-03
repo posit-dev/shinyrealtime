@@ -184,7 +184,7 @@ server <- function(input, output, session) {
     output_audio = 20 / 1e6
   )
 
-  output$plot <- renderPlot({
+  output$plot <- renderPlot(res = 96, {
     req(last_code())
     eval(parse(text = last_code()))
   })
