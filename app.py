@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "matplotlib",
+#     "pandas",
+#     "plotnine",
+#     "seaborn",
+#     "shinychat",
+#     "python-dotenv",
+#     "shiny",
+#     "shinyrealtime @ file://${PROJECT_ROOT}",
+# ]
+# ///
+
 import ast
 import subprocess
 from pathlib import Path
@@ -219,3 +233,6 @@ def exec_with_return(code: str, globals: dict, locals: dict) -> Any | None:
 
 
 app = App(app_ui, server, debug=False)
+
+if __name__ == "__main__":
+    app.run(launch_browser=True, port=0)
