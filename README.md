@@ -38,12 +38,40 @@ remotes::install_github("jcheng5/shinyrealtime/pkg-r")
 uv pip install git+https://github.com/jcheng5/shinyrealtime.git
 ```
 
-## Requirements
+## API Key
 
-This project requires the `OPENAI_API_KEY` environment variable to be set. You can put it in an `.env` file in the root directory:
+shinyrealtime requires the `OPENAI_API_KEY` environment variable to be set. You can put it in an `.env` file in your Shiny app directory:
 
 ```
 OPENAI_API_KEY=<your_api_key>
+```
+
+For R, add the following code to your app.R (it has the side-effect of loading the `.env` file):
+
+```r
+library(dotenv)
+```
+
+For Python, install the `python-dotenv` package and add this near the top of your app.py:
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()
+```
+
+## Demo
+
+To run the demo apps (requires a .env file in the root of this repo, as described in the previous section):
+
+```bash
+# R demo
+make demo-r
+```
+
+```bash
+# Python demo
+make demo-py
 ```
 
 ## Development
@@ -58,18 +86,6 @@ To install both packages:
 
 ```bash
 make install
-```
-
-To run the demo apps:
-
-```bash
-# R demo
-make demo-r
-```
-
-```bash
-# Python demo
-make demo-py
 ```
 
 ## License
