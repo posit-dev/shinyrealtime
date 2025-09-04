@@ -22,11 +22,13 @@ ui <- fluidPage(
   
   realtime_ui(
     "realtime",
-    verbatimTextOutput("output")
+    textOutput("output")
   )
 )
 
 server <- function(input, output, session) {
+  last_message <- reactiveVal("")
+
   rt <- realtime_server(
     "realtime",
     model = "gpt-realtime",
@@ -34,10 +36,12 @@ server <- function(input, output, session) {
   )
   
   # Listen for response text events
-  rt$on("response.text.content", function(event) {
-    output$output <- renderText({
-      event$text
-    })
+  rt$on("response.output_audio_transcript.done", function(event) {
+    last_message(event$transcript)
+  })
+
+  output$output <- renderText({
+    last_message()
   })
 }
 

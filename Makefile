@@ -8,8 +8,10 @@ clean:
 	rm -rf pkg-py/src/shinyrealtime/www/*.js
 	rm -rf pkg-py/src/shinyrealtime/www/*.css
 
-js:
+www/app.css www/app.js &: src/*
 	node build.js
+
+js: www/app.css www/app.js
 
 build-r: js
 	mkdir -p pkg-r/inst/www
@@ -37,6 +39,12 @@ test-r:
 	cd pkg-r && R CMD check --no-manual --no-build-vignettes .
 
 test-py:
-	pytest pkg-py/tests/
+	uv run pytest pkg-py/tests/
 
 test: test-r test-py
+
+demo-r:
+	R --quiet -e "shiny::runApp(launch.browser=TRUE)"
+
+demo-py:
+	uv run app.py

@@ -7,7 +7,7 @@ name = "shinyrealtime"
 version = "0.1.0"
 description = "Real-Time Shiny Interface for OpenAI's Real-Time API"
 readme = "pkg-py/README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
   { name = "Joe Cheng", email = "joe@posit.co" }
