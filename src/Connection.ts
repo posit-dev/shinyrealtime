@@ -21,7 +21,7 @@ export class Connection {
     this.dc.addEventListener("message", (e) => {
       // Notify all registered event listeners
       const data = e.data;
-      console.log("Received event:", data);
+      // console.log("Received event:", data);
 
       // Dispatch event to all registered handlers
       this.eventListeners.forEach((callback) => {

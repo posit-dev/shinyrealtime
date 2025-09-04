@@ -116,3 +116,19 @@ class RealtimeBinding extends Shiny.OutputBinding {
 
 // Register the binding
 Shiny.outputBindings.register(new RealtimeBinding(), "realtime-output");
+
+// Plays audio elements, identified by CSS selector
+Shiny.addCustomMessageHandler(
+  "play_audio",
+  ({ selector }: { selector: string }) => {
+    const audioEl = document.querySelector(selector) as HTMLAudioElement;
+    if (audioEl) {
+      audioEl.currentTime = 0;
+      audioEl.play().catch((err) => {
+        console.error("Error playing audio:", err);
+      });
+    } else {
+      console.error("Audio element not found for selector:", selector);
+    }
+  }
+);

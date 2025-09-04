@@ -13,7 +13,7 @@
 # ///
 
 import ast
-import subprocess
+import base64
 from pathlib import Path
 from typing import Any, Dict
 
@@ -23,7 +23,7 @@ import plotnine as p9
 import seaborn as sns
 import shinychat
 from dotenv import load_dotenv
-from shiny import App, Inputs, Outputs, Session, module, reactive, render, req, ui
+from shiny import App, Inputs, Outputs, Session, reactive, render, req, ui
 from shinyrealtime import realtime_server, realtime_ui
 
 load_dotenv()
@@ -47,6 +47,28 @@ pricing_gpt_4o_mini = {
     "output_text": 2.4 / 1e6,
     "output_audio": 20 / 1e6,
 }
+
+
+def hidden_audio_el(id: str, file_path: str, media_type: str = "audio/mp3"):
+    """Create a hidden HTML audio element with embedded audio data."""
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return ui.HTML("")
+
+    # Read binary data from file
+    raw_data = file_path.read_bytes()
+
+    # Encode to base64
+    base64_data = base64.b64encode(raw_data).decode("utf-8")
+
+    # Create data URI
+    data_uri = f"data:{media_type};base64,{base64_data}"
+
+    # Return HTML audio element
+    return ui.HTML(
+        f'<audio id="{id}" src="{data_uri}" style="display:none;" preload="auto"></audio>'
+    )
+
 
 prompt = (Path(__file__).parent / "prompt.md").read_text()
 
@@ -83,6 +105,7 @@ app_ui = ui.page_sidebar(
         style="z-index: 100000; margin-left: auto; margin-right: auto;",
         right=None,
     ),
+    hidden_audio_el("shutter", "shutter.mp3"),
     title="VoicePlot",
     fillable=True,
     padding="0",
@@ -97,6 +120,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     async def run_python_plot_code(code: str):
         """Run Python code that generates a plot."""
+
         last_code.set(code)
 
     response_text = shinychat.MarkdownStream("response_text")
@@ -183,27 +207,12 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # == Outputs ===============================================================
     @render.plot
-    def plot():
+    async def plot():
         req(last_code())
         result = exec_with_return(last_code(), globals(), locals())
 
-        # Play shutter sound
-        # TODO: Make this work on Windows, Linux, etc.
-        # Play shutter sound
-        import platform
-
-        if platform.system() == "Windows":
-            subprocess.Popen(
-                [
-                    "powershell",
-                    "-c",
-                    "(New-Object Media.SoundPlayer 'shutter.mp3').PlaySync()",
-                ]
-            )
-        elif platform.system() == "Darwin":
-            subprocess.Popen(["afplay", "shutter.mp3"])
-        elif platform.system() == "Linux":
-            subprocess.Popen(["aplay", "shutter.mp3"])
+        # On success, play shutter sound using JavaScript
+        await session.send_custom_message("play_audio", {"selector": "#shutter"})
 
         return result
 

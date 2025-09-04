@@ -35,6 +35,14 @@ prompt <- paste0(
   paste(samples, collapse = "\n\n")
 )
 
+hidden_audio_el <- function(id, file_path, media_type = "audio/mp3") {
+  raw_data <- readBin(file_path, "raw", file.info(file_path)$size)
+  base64_data <- base64enc::base64encode(raw_data)
+  data_uri <- paste0("data:", media_type, ";base64,", base64_data)
+  tags$audio(id = id, src = data_uri, style = "display:none;", preload = "auto")
+}
+
+
 ui <- page_sidebar(
   title = "VoicePlot",
   fillable = TRUE,
@@ -62,6 +70,7 @@ ui <- page_sidebar(
     style = "z-index: 100000; margin-left: auto; margin-right: auto;",
     right = NULL
   ),
+  hidden_audio_el("shutter", "shutter.mp3")
 )
 
 server <- function(input, output, session) {
@@ -82,7 +91,6 @@ server <- function(input, output, session) {
   append_transcript(greeting, clear = TRUE)
 
   run_r_plot_code <- function(code) {
-    beepr::beep("shutter.wav")
     last_code(code)
   }
 
@@ -187,7 +195,13 @@ server <- function(input, output, session) {
 
   output$plot <- renderPlot(res = 96, {
     req(last_code())
-    eval(parse(text = last_code()))
+    result <- withVisible(eval(parse(text = last_code())))
+    session$sendCustomMessage("play_audio", list(selector = "#shutter"))
+    if (result$visible) {
+      result$value
+    } else {
+      invisible(result$value)
+    }
   })
 
   output$code_text <- renderText({
