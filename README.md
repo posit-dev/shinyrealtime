@@ -28,14 +28,14 @@ This repository contains both R and Python packages:
 
 ```r
 # Install from GitHub
-remotes::install_github("jcheng5/shinyrealtime/pkg-r")
+remotes::install_github("posit-dev/shinyrealtime/pkg-r")
 ```
 
 ### Python Package
 
 ```bash
 # Install from GitHub
-uv pip install git+https://github.com/jcheng5/shinyrealtime.git
+uv pip install git+https://github.com/posit-dev/shinyrealtime.git
 ```
 
 ## API Key
