@@ -15,8 +15,6 @@ reticulate::py_require(c(
   "plotnine",
   "seaborn"
 ))
-# load the python module up front, to avoid the initialization delay later
-invisible(reticulate::import("matplotlib"))
 
 
 py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
@@ -29,7 +27,7 @@ py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
   )
 
   # run the code
-  reticulate::py_run_string(code)
+  reticulate::py_run_string(code, local = TRUE)
 
   # fetch the matplotlib figure, save as png
   img_path <- tempfile("reticulate-matplotlib-plot-", fileext = ".png")
@@ -38,13 +36,13 @@ py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
   .[width_in, height_in] <- dev.size(units = "in")
   save_img_code <- glue::glue(
     r"---(
-      import matplotlib.pyplot as plt
-      fig = plt.gcf()
-      fig.set_dpi({dpi})
-      fig.set_size_inches({width_in}, {height_in})
-      fig.savefig(r'''{img_path}''', dpi={dpi})
-      plt.close('all')
-      )---"
+    import matplotlib.pyplot as plt
+    fig = plt.gcf()
+    fig.set_dpi({dpi})
+    fig.set_size_inches({width_in}, {height_in})
+    fig.savefig(r'''{img_path}''', dpi={dpi})
+    plt.close('all')
+    )---"
   )
   reticulate::py_run_string(save_img_code, local = TRUE)
 
@@ -56,6 +54,22 @@ py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
   rasterImage(img, 0, 0, 1, 1, interpolate = FALSE)
   invisible()
 }
+
+# warmup the Python code path to avoid the initialization delay later
+withr::with_tempfile("warmup.png", {
+  withr::with_png("warmup.png", {
+    py_run_string_and_draw_matplotlib(glue::trim(
+      '
+      from plotnine import * 
+      from plotnine.data import anscombe_quartet 
+      
+      plot = ggplot(anscombe_quartet, aes(x="x", y="y")) + geom_point()
+      plot.show()
+      '
+    ))
+  })
+})
+
 
 # Read prompt file
 prompt <- readLines("prompt-r.md") |> paste(collapse = "\n")
