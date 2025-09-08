@@ -56,18 +56,19 @@ py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
 }
 
 # warmup the Python code path to avoid the initialization delay later
-withr::with_tempfile("warmup.png", {
-  withr::with_png("warmup.png", {
-    py_run_string_and_draw_matplotlib(glue::trim(
-      '
-      from plotnine import * 
-      from plotnine.data import anscombe_quartet 
-      
-      plot = ggplot(anscombe_quartet, aes(x="x", y="y")) + geom_point()
-      plot.show()
-      '
-    ))
-  })
+local({
+  path <- withr::local_tempfile(pattern = "warmup")
+  withr::local_png(path)
+
+  py_run_string_and_draw_matplotlib(glue::trim(
+    '
+    from plotnine import * 
+    from plotnine.data import anscombe_quartet 
+    
+    plot = ggplot(anscombe_quartet, aes(x="x", y="y")) + geom_point()
+    plot.show()
+    '
+  ))
 })
 
 
