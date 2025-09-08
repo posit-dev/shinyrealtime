@@ -54,7 +54,10 @@ ui <- page_sidebar(
   card(
     full_screen = TRUE,
     card_header("Plot"),
-    card_body(padding = 0, plotOutput("plot", fill = TRUE)),
+    card_body(
+      padding = 0,
+      uiOutput("plot_container", fill = TRUE)
+    ),
     height = "66%"
   ),
   layout_columns(
@@ -75,6 +78,7 @@ ui <- page_sidebar(
 
 server <- function(input, output, session) {
   last_code <- reactiveVal()
+  interaction_mode <- reactiveVal("none")
   running_cost <- reactiveVal(0) # Cost of tokens used in the session, in dollars
 
   greeting <- "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, click-and-hold the mic for push-to-talk, or hold the spacebar key for push-to-talk."
@@ -104,29 +108,58 @@ server <- function(input, output, session) {
     )
   )
 
+  set_plot_interaction_mode <- function(mode) {
+    interaction_mode(mode)
+    if (mode == "click") {
+      shiny::showNotification(
+        "Plot interaction mode set to 'click'. Click on the plot to send click coordinates to the assistant.",
+        type = "message",
+        duration = 5
+      )
+    } else if (mode == "brush") {
+      shiny::showNotification(
+        "Plot interaction mode set to 'brush'. Brush a region on the plot to send brush coordinates to the assistant.",
+        type = "message",
+        duration = 5
+      )
+    }
+  }
+
+  set_plot_interaction_mode_tool <- ellmer::tool(
+    set_plot_interaction_mode,
+    "Set the plot interaction mode. When an interaction mode is set, user interactions with the plot will be sent back to the assistant as text messages.",
+    arguments = list(
+      mode = type_string(
+        "The interaction mode to set. One of 'none', 'click', or 'brush'."
+      )
+    )
+  )
+
   realtime_controls <- realtime_server(
     "realtime1",
+    model = "gpt-realtime",
     voice = "cedar",
     instructions = prompt,
-    tools = list(run_r_plot_code_tool),
+    tools = list(run_r_plot_code_tool, set_plot_interaction_mode_tool),
     speed = 1.1
   )
+
+  progress <- NULL
+
+  realtime_controls$on("response.created", \(event) {
+    progress <<- Progress$new()
+    progress$set(value = NULL, message = "Generating response...")
+  })
+
+  realtime_controls$on("response.done", \(event) {
+    progress$close()
+    progress <<- NULL
+  })
 
   # Handle function call start - show notification
   realtime_controls$on("conversation.item.added", \(event) {
     if (event$item$type == "function_call") {
-      shiny::showNotification(
-        "Generating code, please wait...",
-        id = event$item$id,
-        closeButton = FALSE
-      )
-    }
-  })
-
-  # Handle function call completion - remove notification
-  realtime_controls$on("conversation.item.done", \(event) {
-    if (event$item$type == "function_call") {
-      shiny::removeNotification(id = event$item$id)
+      progress$set(message = "Generating code, please wait...")
     }
   })
 
@@ -193,6 +226,25 @@ server <- function(input, output, session) {
     output_audio = 20 / 1e6
   )
 
+  output$plot_container <- renderUI({
+    plotOutput(
+      "plot",
+      click = if (interaction_mode() == "click") {
+        clickOpts(
+          id = "plot_click",
+          clip = FALSE
+        )
+      },
+      brush = if (interaction_mode() == "brush") {
+        brushOpts(
+          id = "plot_brush",
+          resetOnNew = TRUE
+        )
+      },
+      fill = TRUE
+    )
+  })
+
   output$plot <- renderPlot(res = 96, {
     req(last_code())
     result <- withVisible(eval(parse(text = last_code())))
@@ -202,6 +254,36 @@ server <- function(input, output, session) {
     } else {
       invisible(result$value)
     }
+  })
+
+  observeEvent(input$plot_click, {
+    realtime_controls$send_text(
+      paste0(
+        "(The user clicked on the plot at data coordinates (",
+        input$plot_click$x,
+        ", ",
+        input$plot_click$y,
+        ").)"
+      ),
+      force_response = TRUE
+    )
+  })
+
+  observeEvent(input$plot_brush, {
+    realtime_controls$send_text(
+      paste0(
+        "(The user brushed a region on the plot from data coordinates (",
+        input$plot_brush$xmin,
+        ", ",
+        input$plot_brush$ymin,
+        ") to (",
+        input$plot_brush$xmax,
+        ", ",
+        input$plot_brush$ymax,
+        ").)"
+      ),
+      force_response = TRUE
+    )
   })
 
   output$code_text <- renderText({

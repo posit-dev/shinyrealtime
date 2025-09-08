@@ -109,10 +109,11 @@ realtime_server <- function(
     }
 
     # Function to send text
-    send_text <- function(text) {
-      event1 <- list(
-        type = "conversation_item.create",
+    send_text <- function(text, force_response = TRUE) {
+      events <- list(list(
+        type = "conversation.item.create",
         item = list(
+          type = "message",
           role = "user",
           content = list(
             list(
@@ -121,14 +122,18 @@ realtime_server <- function(
             )
           )
         )
-      )
+      ))
 
-      event2 <- list(
-        type = "response.create",
-        response = list()
-      )
+      if (force_response) {
+        events <- c(
+          events,
+          list(list(
+            type = "response.create"
+          ))
+        )
+      }
 
-      send(list(event1, event2))
+      send(events)
     }
 
     # Generate client secret from OpenAI
@@ -186,7 +191,10 @@ realtime_server <- function(
       )
 
       data <- content(res)
-      return(data$value)
+      return(jsonlite::toJSON(
+        list(key = data$value, model = model),
+        auto_unbox = TRUE
+      ))
     })
 
     # Handle key events
@@ -196,6 +204,7 @@ realtime_server <- function(
           event <- evt()
 
           cat("-------------\n")
+          cat(format(Sys.time(), "%Y-%m-%d %H:%M:%OS3"), "\n")
           cat(event$type, "\n")
           cat(input$key_event, "\n")
 
@@ -205,7 +214,15 @@ realtime_server <- function(
               stop(paste("Unknown function:", fname))
             }
             tool_fun <- tools_by_name[[fname]]
-            args <- fromJSON(event$arguments)
+
+            args <- try(fromJSON(event$arguments))
+            if (inherits(args, "try-error")) {
+              shiny::showNotification(
+                "Error: The LLM provided malformed function arguments",
+                type = "error"
+              )
+              return(NULL)
+            }
 
             # Execute the tool function with the arguments
             result <- do.call(tool_fun, args)
@@ -224,8 +241,8 @@ realtime_server <- function(
     })
 
     # Function to send events to the JS
-    send <- function(...) {
-      session$sendCustomMessage("realtime_send", list(...))
+    send <- function(events) {
+      session$sendCustomMessage("realtime_send", events)
     }
 
     # Create return object
