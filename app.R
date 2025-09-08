@@ -21,10 +21,15 @@ py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
   ## eval Python code, size matplotlib current figure to temp png, draw png on R graphics device
 
   # clear any previous matplotlib state
-  reticulate::py_run_string(
-    "import matplotlib; matplotlib.pyplot.close('all'); matplotlib.use('agg', force=True)",
-    local = TRUE
+  clear_prev_state_code <- glue::trim(
+    "
+    import matplotlib
+    import matplotlib.pyplot
+    matplotlib.pyplot.close('all')
+    matplotlib.use('agg', force=True)
+    "
   )
+  reticulate::py_run_string(clear_prev_state_code, local = TRUE)
 
   # run the code
   reticulate::py_run_string(code, local = TRUE)
@@ -62,9 +67,9 @@ local({
 
   py_run_string_and_draw_matplotlib(glue::trim(
     '
-    from plotnine import * 
-    from plotnine.data import anscombe_quartet 
-    
+    from plotnine import *
+    from plotnine.data import anscombe_quartet
+
     plot = ggplot(anscombe_quartet, aes(x="x", y="y")) + geom_point()
     plot.show()
     '
