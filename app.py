@@ -207,14 +207,16 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # == Outputs ===============================================================
     @render.plot
-    async def plot():
+    def plot():
         req(last_code())
         result = exec_with_return(last_code(), globals(), locals())
 
-        # On success, play shutter sound using JavaScript
-        await session.send_custom_message("play_audio", {"selector": "#shutter"})
-
         return result
+
+    @reactive.effect(priority=-10)
+    async def play_shutter():
+        req(last_code())
+        await session.send_custom_message("play_audio", {"selector": "#shutter"})
 
     @render.code
     def code_text():
