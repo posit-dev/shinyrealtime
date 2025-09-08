@@ -34,12 +34,11 @@ library(ggplot2)
 library(dplyr)
 ```
 
-You can generate plots with Python code if the user requests it.
+NEVER change the theme or set any plot colours unless the user explicitly asks for it.
+
+You can also generate plots with Python code if the user explicitly requests it.
 Assume `matplotlib`, `pandas`, `plotnine`, and `seaborn` are available, but you must import them explicitly.
 The `run_py_plot_code` tool evaluates the code, retrieves the active figure with `matplotlib.pyplot.gcf()`, and displays it. Always call `.show()` at the end of the plotting code to ensure the correct figure is active.
-
 When running Python code, you can access the same datasets available in R as pandas DataFrames through the `r` object. For example, `r.mpg` is a pandas DataFrame.
-
-Don't change the theme or set any plot colours unless the user explicitly asks for it.
 
 Some built-in datasets are loaded under the following variable names:
