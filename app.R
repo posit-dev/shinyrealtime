@@ -6,6 +6,75 @@ library(shinychat)
 library(shinyrealtime)
 library(dplyr)
 library(ggplot2)
+library(dotty)
+
+Sys.setenv("RETICULATE_PYTHON" = "managed")
+reticulate::py_require(c(
+  "matplotlib",
+  "pandas",
+  "plotnine",
+  "seaborn"
+))
+
+
+py_run_string_and_draw_matplotlib <- function(code, dpi = 96) {
+  ## eval Python code, size matplotlib current figure to temp png, draw png on R graphics device
+
+  # clear any previous matplotlib state
+  clear_prev_state_code <- glue::trim(
+    "
+    import matplotlib
+    import matplotlib.pyplot
+    matplotlib.pyplot.close('all')
+    matplotlib.use('agg', force=True)
+    "
+  )
+  reticulate::py_run_string(clear_prev_state_code, local = TRUE)
+
+  # run the code
+  reticulate::py_run_string(code, local = TRUE)
+
+  # fetch the matplotlib figure, save as png
+  img_path <- tempfile("reticulate-matplotlib-plot-", fileext = ".png")
+  on.exit(unlink(img_path))
+
+  .[width_in, height_in] <- dev.size(units = "in")
+  save_img_code <- glue::glue(
+    r"---(
+    import matplotlib.pyplot as plt
+    fig = plt.gcf()
+    fig.set_dpi({dpi})
+    fig.set_size_inches({width_in}, {height_in})
+    fig.savefig(r'''{img_path}''', dpi={dpi})
+    plt.close('all')
+    )---"
+  )
+  reticulate::py_run_string(save_img_code, local = TRUE)
+
+  # Draw png onto the R device
+  img <- png::readPNG(img_path, native = TRUE)
+  par(mar = c(0, 0, 0, 0))
+  plot.new()
+  plot.window(xlim = 0:1, ylim = 0:1, xaxs = "i", yaxs = "i")
+  rasterImage(img, 0, 0, 1, 1, interpolate = FALSE)
+  invisible()
+}
+
+# warmup the Python code path to avoid the initialization delay later
+local({
+  path <- withr::local_tempfile(pattern = "warmup")
+  withr::local_png(path)
+
+  py_run_string_and_draw_matplotlib(glue::trim(
+    '
+    from plotnine import *
+    from plotnine.data import anscombe_quartet
+
+    plot = ggplot(anscombe_quartet, aes(x="x", y="y")) + geom_point()
+    plot.show()
+    '
+  ))
+})
 
 
 # Read prompt file
@@ -104,11 +173,26 @@ server <- function(input, output, session) {
     )
   )
 
+  run_py_plot_code <- function(code) {
+    attr(code, "language") <- "python"
+    last_code(code)
+  }
+
+  run_py_plot_code_tool <- ellmer::tool(
+    run_py_plot_code,
+    "Run Python code (matplotlib) that generates a static plot",
+    arguments = list(
+      code = type_string(
+        "The Python code to run that generates a matplotlib figure. If using plotnine, the code should call `.show()` on the plot object."
+      )
+    )
+  )
+
   realtime_controls <- realtime_server(
     "realtime1",
     voice = "cedar",
     instructions = prompt,
-    tools = list(run_r_plot_code_tool),
+    tools = list(run_r_plot_code_tool, run_py_plot_code_tool),
     speed = 1.1
   )
 
@@ -193,9 +277,16 @@ server <- function(input, output, session) {
     output_audio = 20 / 1e6
   )
 
-  output$plot <- renderPlot(res = 96, {
+  output$plot <- renderPlot(res = 96, execOnResize = TRUE, {
     req(last_code())
-    result <- withVisible(eval(parse(text = last_code())))
+
+    code <- last_code()
+    if (identical(attr(code, "language"), "python")) {
+      py_run_string_and_draw_matplotlib(code, dpi = 96)
+      result <- list(visible = FALSE, value = NULL)
+    } else {
+      result <- withVisible(eval(parse(text = code)))
+    }
     session$sendCustomMessage("play_audio", list(selector = "#shutter"))
     if (result$visible) {
       result$value
