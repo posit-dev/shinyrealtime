@@ -6,10 +6,8 @@ from typing import Any, Callable, Dict, List, Literal, Tuple, Union
 
 import aiohttp
 import chatlas
-import openai.types.beta.realtime as oair
 from faicons import icon_svg
 from htmltools import HTMLDependency
-from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
 from ._events import EventEmitter
@@ -125,27 +123,29 @@ def realtime_server(
     async def send_message():
         await send_text(input.msg())
 
-    async def send_text(text: str):
+    async def send_text(text: str, force_response: bool = True):
         """
         Sends a text message to the AI.
-        
+
         Args:
             text: The text to send
+            force_response: Whether to force a response from the AI (default: True)
         """
-        await send(
-            oair.ConversationItemCreateEvent(
-                item=oair.ConversationItem(
+        events = [
+            dict(
+                type="conversation.item.create",
+                item=dict(
+                    type="message",
                     role="user",
-                    content=[
-                        oair.ConversationItemContent(
-                            type="input_text",
-                            text=text,
-                        )
-                    ],
+                    content=[dict(type="input_text", text=text)],
                 ),
-            ),
-            oair.ResponseCreateEvent(response={}),
-        )
+            )
+        ]
+
+        if force_response:
+            events.append(dict(type="response.create"))
+
+        await send(*events)
 
     @output(suspend_when_hidden=False)
     @render.text
@@ -190,7 +190,7 @@ def realtime_server(
                 | kwargs,
             ) as response:
                 data = await response.json()
-                return data["value"]
+                return json.dumps({"key": data["value"], "model": model})
 
     @reactive.Effect
     @reactive.event(input.key_event)
@@ -220,7 +220,17 @@ def realtime_server(
                 if fname not in tools_by_name:
                     raise ValueError(f"Unknown function: {fname}")
                 tool = tools_by_name[fname]
-                args = json.loads(event["arguments"])
+
+                # Parse arguments with proper error handling
+                try:
+                    args = json.loads(event["arguments"])
+                except json.JSONDecodeError:
+                    ui.notification_show(
+                        "Error: The LLM provided malformed function arguments",
+                        type="error",
+                    )
+                    return
+
                 # If the tool is async, we need to await it
                 if asyncio.iscoroutinefunction(tool):
                     _result = await tool(**args)
@@ -289,10 +299,8 @@ class RealtimeControls:
         current_event: Reactive value containing the current event
         on: Function to register event handlers
     """
-    send: Callable[
-        [Union[oair.ConversationItemCreateEvent, oair.ResponseCreateEvent]], Any
-    ]
-    send_text: Callable[[str], Any]
+    send: Callable[[dict[str, Any]], Any]
+    send_text: Callable[[str, bool], Any]
     current_event: reactive.Value
     on: Callable[
         [str], Callable[[Callable[[dict[str, Any]], None]], Callable[[], None]]

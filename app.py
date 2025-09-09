@@ -90,7 +90,7 @@ app_ui = ui.page_sidebar(
     ),
     ui.card(
         ui.card_header("Plot"),
-        ui.card_body(ui.output_plot("plot", fill=True), padding=0),
+        ui.card_body(ui.output_ui("plot_container", fill=True), padding=0),
         height="66%",
         full_screen=True,
     ),
@@ -114,6 +114,7 @@ app_ui = ui.page_sidebar(
 
 def server(input: Inputs, output: Outputs, session: Session):
     last_code = reactive.value()
+    interaction_mode = reactive.value("none")
 
     # Setup cost tracking
     running_cost = reactive.value(0)
@@ -123,17 +124,42 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         last_code.set(code)
 
+    def set_plot_interaction_mode(mode: str):
+        """Set the plot interaction mode.
+
+        When an interaction mode is set, user interactions with the plot
+        will be sent back to the assistant as text messages.
+
+        Args:
+            mode: The interaction mode to set. One of 'none', 'click', or 'brush'.
+        """
+        interaction_mode.set(mode)
+
+        if mode == "click":
+            ui.notification_show(
+                "Plot interaction mode set to 'click'. Click on the plot to send click coordinates to the assistant.",
+                duration=5,
+            )
+        elif mode == "brush":
+            ui.notification_show(
+                "Plot interaction mode set to 'brush'. Brush a region on the plot to send brush coordinates to the assistant.",
+                duration=5,
+            )
+
     response_text = shinychat.MarkdownStream("response_text")
 
     realtime_controls = realtime_server(
         "realtime1",
         voice="cedar",
         instructions=prompt,
-        tools=[run_python_plot_code],
+        tools=[run_python_plot_code, set_plot_interaction_mode],
         speed=1.1,
     )
 
     greeting = "Welcome to Shiny Realtime!\n\nYou're currently muted; click the mic button to unmute, click-and-hold the mic for push-to-talk, or hold the spacebar key for push-to-talk."
+
+    # Track progress indicator
+    progress = None
 
     @reactive.effect
     async def _stream_greeting():
@@ -143,23 +169,37 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # == Handle realtime events ================================================
 
+    @realtime_controls.on("response.created")
+    async def _show_progress(event: dict[str, Any]):
+        "Show progress indicator when response starts"
+        nonlocal progress
+
+        progress = ui.Progress()
+        progress.set(value=None, message="Thinking...")
+
+    @realtime_controls.on("response.done")
+    async def _hide_progress(event: dict[str, Any]):
+        "Hide progress indicator when response completes"
+        nonlocal progress
+
+        if progress is not None:
+            progress.close()
+            progress = None
+
     @realtime_controls.on("conversation.item.added")
     async def _show_coding_progress(event: dict[str, Any]):
         "Add notifications when function calls start"
 
         if event["item"]["type"] == "function_call":
-            ui.notification_show(
-                "Generating code, please wait...",
-                id=event["item"]["id"],
-                close_button=False,
-            )
+            nonlocal progress
+            if progress is not None:
+                progress.set(message="Generating code, please wait...")
 
     @realtime_controls.on("conversation.item.done")
     async def _hide_coding_progress(event: dict[str, Any]):
         "Remove notifications when function calls complete"
 
-        if event["item"]["type"] == "function_call":
-            ui.notification_remove(id=event["item"]["id"])
+        # No need to explicitly remove notifications with the progress indicator approach
 
     @realtime_controls.on("response.done")
     async def _track_session_cost(event):
@@ -205,7 +245,39 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         await response_text.stream([event["delta"]], clear=False)
 
+    @reactive.effect
+    @reactive.event(input.plot_click)
+    async def _handle_plot_click():
+        "Handle plot clicks and send them to the assistant"
+
+        await realtime_controls.send_text(
+            f"(The user clicked on the plot at data coordinates ({input.plot_click()['x']}, {input.plot_click()['y']}).)\n",
+            force_response=True,
+        )
+
+    @reactive.effect
+    @reactive.event(input.plot_brush)
+    async def _handle_plot_brush():
+        "Handle plot brushing and send the brush coordinates to the assistant"
+
+        brush = input.plot_brush()
+        await realtime_controls.send_text(
+            f"(The user brushed a region on the plot from data coordinates ({brush['xmin']}, {brush['ymin']}) to ({brush['xmax']}, {brush['ymax']}).)\n",
+            force_response=True,
+        )
+
     # == Outputs ===============================================================
+    @render.ui
+    def plot_container():
+        click_opts = False
+        brush_opts = False
+        if interaction_mode() == "click":
+            click_opts = ui.click_opts(clip=False)
+        elif interaction_mode() == "brush":
+            brush_opts = ui.brush_opts(reset_on_new=True)
+
+        return ui.output_plot("plot", click=click_opts, brush=brush_opts, fill=True)
+
     @render.plot
     def plot():
         req(last_code())
