@@ -21,10 +21,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotnine as p9
 import seaborn as sns
-import shinychat
 from dotenv import load_dotenv
 from shiny import App, Inputs, Outputs, Session, reactive, render, req, ui
 from shinyrealtime import realtime_server, realtime_ui
+
+# ImportError circular import
+import shinychat
+
 
 load_dotenv()
 
