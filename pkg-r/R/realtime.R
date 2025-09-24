@@ -92,6 +92,7 @@ realtime_server <- function(
   instructions = "",
   tools = list(),
   api_key = NULL,
+  debug = FALSE,
   ...
 ) {
   moduleServer(id, function(input, output, session) {
@@ -129,6 +130,20 @@ realtime_server <- function(
       )
 
       send(list(event1, event2))
+    }
+
+    send_function_call_output <- function(call_id, output) {
+      item <- list(
+        type = "function_call_output",
+        call_id = call_id,
+        output = jsonlite::toJSON(output, auto_unbox = TRUE),
+        object = "realtime.item"
+      )
+      event <- list(
+        type = "conversation.item.create",
+        item = item
+      )
+      send(list(event))
     }
 
     # Generate client secret from OpenAI
@@ -191,15 +206,16 @@ realtime_server <- function(
 
     # Handle key events
     observeEvent(input$key_event, {
-      tryCatch(
-        {
-          event <- evt()
+      event <- evt()
+      if (debug) {
+        cat("-------------\n")
+        cat(event$type, "\n")
+        cat(input$key_event, "\n")
+      }
 
-          cat("-------------\n")
-          cat(event$type, "\n")
-          cat(input$key_event, "\n")
-
-          if (event$type == "response.function_call_arguments.done") {
+      if (event$type == "response.function_call_arguments.done") {
+        tryCatch(
+          {
             fname <- event$name
             if (!fname %in% names(tools_by_name)) {
               stop(paste("Unknown function:", fname))
@@ -209,14 +225,13 @@ realtime_server <- function(
 
             # Execute the tool function with the arguments
             result <- do.call(tool_fun, args)
-            # No return of result to model yet
+          },
+          error = function(e) {
+            shiny::printStackTrace(e)
+            send_text(paste("Error processing function call:", e$message))
           }
-        },
-        error = function(e) {
-          message(e)
-          send_text(paste("Error processing function call:", e$message))
-        }
-      )
+        )
+      }
     })
 
     evt <- reactive({
@@ -225,6 +240,14 @@ realtime_server <- function(
 
     # Function to send events to the JS
     send <- function(...) {
+      if (debug) {
+        for (msg in list(...)) {
+          cat("-------------\n")
+          cat("Sending events:\n")
+          cat(toJSON(msg, auto_unbox = TRUE), "\n")
+        }
+      }
+
       session$sendCustomMessage("realtime_send", list(...))
     }
 
