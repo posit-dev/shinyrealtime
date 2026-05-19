@@ -3,7 +3,22 @@ import { Connection } from "./Connection";
 import { MicButton } from "./MicButton";
 import "./styles.css";
 
-export async function openConnection(ephemeralKey: string) {
+export async function openConnection(payload: string) {
+  // Parse payload: may be a JSON object {value, model} or a bare ephemeral key string
+  let ephemeralKey: string;
+  let model = "gpt-realtime";
+  try {
+    const parsed = JSON.parse(payload);
+    if (parsed && typeof parsed === "object" && parsed.value) {
+      ephemeralKey = parsed.value;
+      if (parsed.model) model = parsed.model;
+    } else {
+      ephemeralKey = payload;
+    }
+  } catch {
+    ephemeralKey = payload;
+  }
+
   // Create a peer connection
   const pc = new RTCPeerConnection();
 
@@ -29,8 +44,7 @@ export async function openConnection(ephemeralKey: string) {
   await pc.setLocalDescription(offer);
 
   const baseUrl = "https://api.openai.com/v1/realtime/calls";
-  const model = "gpt-realtime";
-  const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+  const sdpResponse = await fetch(`${baseUrl}?model=${encodeURIComponent(model)}`, {
     method: "POST",
     body: offer.sdp,
     headers: {

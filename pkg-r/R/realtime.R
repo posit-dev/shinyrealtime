@@ -201,7 +201,7 @@ realtime_server <- function(
       )
 
       data <- content(res)
-      return(data$value)
+      toJSON(list(value = data$value, model = model), auto_unbox = TRUE)
     })
 
     # Handle key events

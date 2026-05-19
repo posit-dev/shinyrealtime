@@ -190,7 +190,7 @@ def realtime_server(
                 | kwargs,
             ) as response:
                 data = await response.json()
-                return data["value"]
+                return json.dumps({"value": data["value"], "model": model})
 
     @reactive.Effect
     @reactive.event(input.key_event)
