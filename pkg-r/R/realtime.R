@@ -153,8 +153,7 @@ realtime_server <- function(
       item <- list(
         type = "function_call_output",
         call_id = call_id,
-        output = coerce_output(output),
-        object = "realtime.item"
+        output = coerce_output(output)
       )
       event <- list(
         type = "conversation.item.create",
