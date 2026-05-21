@@ -259,17 +259,27 @@ realtime_server <- function(
       fromJSON(req(input$key_event), simplifyVector = FALSE)
     })
 
-    # Function to send events to the JS
+    # Function to send events to the JS.
+    # Accepts either a list of events: send(list(e1, e2))
+    # or events as separate args:     send(e1, e2)
+    # Always serializes to a flat JSON array [{e1}, {e2}] so the JS
+    # handler can forEach over individual events.
     send <- function(...) {
-      if (debug) {
-        for (msg in list(...)) {
-          cat("-------------\n")
-          cat("Sending events:\n")
-          cat(toJSON(msg, auto_unbox = TRUE), "\n")
-        }
+      args <- list(...)
+      # Unwrap single-list-arg form so we don't double-wrap into a nested array
+      if (length(args) == 1 && is.list(args[[1]]) && is.null(names(args[[1]]))) {
+        events <- args[[1]]
+      } else {
+        events <- args
       }
 
-      session$sendCustomMessage("realtime_send", list(...))
+      if (debug) {
+        cat("-------------\n")
+        cat("Sending events:\n")
+        cat(toJSON(events, auto_unbox = TRUE), "\n")
+      }
+
+      session$sendCustomMessage("realtime_send", events)
     }
 
     # Create return object
