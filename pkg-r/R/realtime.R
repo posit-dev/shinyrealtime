@@ -112,7 +112,7 @@ realtime_server <- function(
     # Function to send text
     send_text <- function(text) {
       event1 <- list(
-        type = "conversation_item.create",
+        type = "conversation.item.create",
         item = list(
           role = "user",
           content = list(
@@ -132,11 +132,24 @@ realtime_server <- function(
       send(list(event1, event2))
     }
 
+    # Coerce tool result to non-empty scalar string. Realtime API spec wants
+    # `output` to be a plain string; if the tool returned NULL/empty/non-scalar
+    # we substitute a fallback so jsonlite never emits an empty value.
+    coerce_output <- function(x, fallback = "OK") {
+      if (is.null(x)) return(fallback)
+      if (length(x) == 0) return(fallback)
+      s <- tryCatch(as.character(x), error = function(e) NULL)
+      if (is.null(s)) return(fallback)
+      if (length(s) > 1) s <- paste(s, collapse = "\n")
+      if (!nzchar(s)) return(fallback)
+      s
+    }
+
     send_function_call_output <- function(call_id, output) {
       item <- list(
         type = "function_call_output",
         call_id = call_id,
-        output = jsonlite::toJSON(output, auto_unbox = TRUE),
+        output = coerce_output(output),
         object = "realtime.item"
       )
       event <- list(
@@ -225,10 +238,18 @@ realtime_server <- function(
 
             # Execute the tool function with the arguments
             result <- do.call(tool_fun, args)
+
+            # gpt-realtime-2 requires a function_call_output matching the
+            # original call_id, otherwise the model treats the call as still
+            # in-flight. Then prompt the model to continue with response.create.
+            send_function_call_output(event$call_id, result)
+            send(list(list(type = "response.create", response = list())))
           },
           error = function(e) {
-            shiny::printStackTrace(e)
-            send_text(paste("Error processing function call:", e$message))
+            # Avoid shiny::printStackTrace — dropTrivialFrames can crash apps.
+            message("Error processing function call: ", conditionMessage(e))
+            send_function_call_output(event$call_id, "ERROR_HANDLED")
+            send(list(list(type = "response.create", response = list())))
           }
         )
       }
