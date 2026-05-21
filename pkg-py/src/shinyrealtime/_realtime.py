@@ -125,6 +125,32 @@ def realtime_server(
     async def send_message():
         await send_text(input.msg())
 
+    def _coerce_output(x: Any, fallback: str = "OK") -> str:
+        """Coerce tool result to non-empty scalar string per Realtime API spec."""
+        if x is None:
+            return fallback
+        try:
+            s = x if isinstance(x, str) else json.dumps(x) if not isinstance(x, (int, float, bool)) else str(x)
+        except Exception:
+            return fallback
+        if not s:
+            return fallback
+        return s
+
+    async def send_function_call_output(call_id: str, output: Any):
+        """Send function_call_output + response.create so the model continues."""
+        await send(
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": _coerce_output(output),
+                },
+            },
+            {"type": "response.create", "response": {}},
+        )
+
     async def send_text(text: str):
         """
         Sends a text message to the AI.
@@ -208,7 +234,11 @@ def realtime_server(
         except Exception as e:
             print(f"Event: {input.key_event()}")
             print(f"Error processing event: {e}")
-            await send_text("The function call you sent was malformed, try again?")
+            await send_text(
+                "(System: an internal event could not be parsed. "
+                "Please briefly let the user know something went wrong.)"
+            )
+            return
 
         print("-------------")
         print(event["type"])
@@ -226,9 +256,12 @@ def realtime_server(
                     _result = await tool(**args)
                 else:
                     _result = tool(**args)
-                # TODO: Return the result to the model?
+                # gpt-realtime-2 requires a function_call_output matching the
+                # call_id, otherwise the model treats the call as in-flight.
+                await send_function_call_output(event["call_id"], _result)
         except Exception as e:
-            await send_text(f"Error processing function call: {e}")
+            print(f"Error processing function call: {e}")
+            await send_function_call_output(event["call_id"], "ERROR_HANDLED")
 
     async def send(*events: dict[str, Any]):
         """
