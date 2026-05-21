@@ -126,11 +126,15 @@ realtime_server <- function(
 
       event2 <- list(
         type = "response.create",
-        response = list()
+        response = empty_obj()
       )
 
       send(list(event1, event2))
     }
+
+    # jsonlite serializes list() to [] (JSON array). To get {} (JSON object)
+    # we need a named-but-empty list. Realtime API rejects `response: []`.
+    empty_obj <- function() setNames(list(), character(0))
 
     # Coerce tool result to non-empty scalar string. Realtime API spec wants
     # `output` to be a plain string; if the tool returned NULL/empty/non-scalar
@@ -243,13 +247,13 @@ realtime_server <- function(
             # original call_id, otherwise the model treats the call as still
             # in-flight. Then prompt the model to continue with response.create.
             send_function_call_output(event$call_id, result)
-            send(list(list(type = "response.create", response = list())))
+            send(list(list(type = "response.create", response = empty_obj())))
           },
           error = function(e) {
             # Avoid shiny::printStackTrace — dropTrivialFrames can crash apps.
             message("Error processing function call: ", conditionMessage(e))
             send_function_call_output(event$call_id, "ERROR_HANDLED")
-            send(list(list(type = "response.create", response = list())))
+            send(list(list(type = "response.create", response = empty_obj())))
           }
         )
       }
