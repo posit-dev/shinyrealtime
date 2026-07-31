@@ -13,6 +13,7 @@ from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
 from ._events import EventEmitter
+from ._utils import _coerce_output
 
 
 def dep() -> HTMLDependency:
@@ -124,18 +125,6 @@ def realtime_server(
     @reactive.event(input.send)
     async def send_message():
         await send_text(input.msg())
-
-    def _coerce_output(x: Any, fallback: str = "OK") -> str:
-        """Coerce tool result to non-empty scalar string per Realtime API spec."""
-        if x is None:
-            return fallback
-        try:
-            s = x if isinstance(x, str) else json.dumps(x) if not isinstance(x, (int, float, bool)) else str(x)
-        except Exception:
-            return fallback
-        if not s:
-            return fallback
-        return s
 
     async def send_function_call_output(call_id: str, output: Any):
         """Send function_call_output + response.create so the model continues."""
@@ -261,7 +250,9 @@ def realtime_server(
                 await send_function_call_output(event["call_id"], _result)
         except Exception as e:
             print(f"Error processing function call: {e}")
-            await send_function_call_output(event["call_id"], "ERROR_HANDLED")
+            # Forward the actual error message so the model can tell the user
+            # what went wrong instead of silently guessing.
+            await send_function_call_output(event["call_id"], f"Error: {e}")
 
     async def send(*events: dict[str, Any]):
         """

@@ -3,22 +3,7 @@ import { Connection } from "./Connection";
 import { MicButton } from "./MicButton";
 import "./styles.css";
 
-export async function openConnection(payload: string) {
-  // Parse payload: may be a JSON object {value, model} or a bare ephemeral key string
-  let ephemeralKey: string;
-  let model = "gpt-realtime";
-  try {
-    const parsed = JSON.parse(payload);
-    if (parsed && typeof parsed === "object" && parsed.value) {
-      ephemeralKey = parsed.value;
-      if (parsed.model) model = parsed.model;
-    } else {
-      ephemeralKey = payload;
-    }
-  } catch {
-    ephemeralKey = payload;
-  }
-
+export async function openConnection(ephemeralKey: string, model: string) {
   // Create a peer connection
   const pc = new RTCPeerConnection();
 
@@ -72,8 +57,15 @@ class RealtimeBinding extends Shiny.OutputBinding {
   renderValue(el, data) {
     const id = this.getId(el);
 
+    // The server ships {value, model} as a JSON-encoded string. Server and
+    // client ship together in the same package version, so no fallback is
+    // needed for an older bare-string payload.
+    const parsed = JSON.parse(data);
+    const ephemeralKey: string = parsed.value;
+    const model: string = parsed.model;
+
     // Store connection in element data for cleanup
-    let connectionPromise = openConnection(data).then((connection) => {
+    let connectionPromise = openConnection(ephemeralKey, model).then((connection) => {
       $(document).on("shiny:disconnected", function () {
         console.log("Shiny disconnected, cleaning up any WebRTC connections");
         connection.close();

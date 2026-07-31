@@ -129,37 +129,27 @@ realtime_server <- function(
         response = empty_obj()
       )
 
-      send(list(event1, event2))
+      send(event1, event2)
     }
 
-    # jsonlite serializes list() to [] (JSON array). To get {} (JSON object)
-    # we need a named-but-empty list. Realtime API rejects `response: []`.
-    empty_obj <- function() setNames(list(), character(0))
-
-    # Coerce tool result to non-empty scalar string. Realtime API spec wants
-    # `output` to be a plain string; if the tool returned NULL/empty/non-scalar
-    # we substitute a fallback so jsonlite never emits an empty value.
-    coerce_output <- function(x, fallback = "OK") {
-      if (is.null(x)) return(fallback)
-      if (length(x) == 0) return(fallback)
-      s <- tryCatch(as.character(x), error = function(e) NULL)
-      if (is.null(s)) return(fallback)
-      if (length(s) > 1) s <- paste(s, collapse = "\n")
-      if (!nzchar(s)) return(fallback)
-      s
-    }
-
+    # Sends the function_call_output item AND the follow-up response.create
+    # so the model actually continues its turn. gpt-realtime-2 leaves the
+    # call in-flight without the response.create. Mirrors the Python
+    # send_function_call_output so both languages behave identically.
     send_function_call_output <- function(call_id, output) {
-      item <- list(
-        type = "function_call_output",
-        call_id = call_id,
-        output = coerce_output(output)
-      )
-      event <- list(
+      item_event <- list(
         type = "conversation.item.create",
-        item = item
+        item = list(
+          type = "function_call_output",
+          call_id = call_id,
+          output = coerce_output(output)
+        )
       )
-      send(list(event))
+      response_event <- list(
+        type = "response.create",
+        response = empty_obj()
+      )
+      send(item_event, response_event)
     }
 
     # Generate client secret from OpenAI
@@ -244,15 +234,19 @@ realtime_server <- function(
 
             # gpt-realtime-2 requires a function_call_output matching the
             # original call_id, otherwise the model treats the call as still
-            # in-flight. Then prompt the model to continue with response.create.
+            # in-flight. send_function_call_output also emits response.create
+            # so the model continues its turn.
             send_function_call_output(event$call_id, result)
-            send(list(list(type = "response.create", response = empty_obj())))
           },
           error = function(e) {
             # Avoid shiny::printStackTrace — dropTrivialFrames can crash apps.
+            # Forward the actual error message so the model can tell the user
+            # what went wrong instead of silently guessing.
             message("Error processing function call: ", conditionMessage(e))
-            send_function_call_output(event$call_id, "ERROR_HANDLED")
-            send(list(list(type = "response.create", response = empty_obj())))
+            send_function_call_output(
+              event$call_id,
+              paste("Error:", conditionMessage(e))
+            )
           }
         )
       }
@@ -263,18 +257,12 @@ realtime_server <- function(
     })
 
     # Function to send events to the JS.
-    # Accepts either a list of events: send(list(e1, e2))
-    # or events as separate args:     send(e1, e2)
+    # Preferred form:                  send(e1, e2)
+    # Also accepted (backward compat): send(list(e1, e2))
     # Always serializes to a flat JSON array [{e1}, {e2}] so the JS
     # handler can forEach over individual events.
     send <- function(...) {
-      args <- list(...)
-      # Unwrap single-list-arg form so we don't double-wrap into a nested array
-      if (length(args) == 1 && is.list(args[[1]]) && is.null(names(args[[1]]))) {
-        events <- args[[1]]
-      } else {
-        events <- args
-      }
+      events <- flatten_events(...)
 
       if (debug) {
         cat("-------------\n")
