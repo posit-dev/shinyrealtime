@@ -112,7 +112,7 @@ realtime_server <- function(
     # Function to send text
     send_text <- function(text) {
       event1 <- list(
-        type = "conversation_item.create",
+        type = "conversation.item.create",
         item = list(
           role = "user",
           content = list(
@@ -126,24 +126,30 @@ realtime_server <- function(
 
       event2 <- list(
         type = "response.create",
-        response = list()
+        response = empty_obj()
       )
 
-      send(list(event1, event2))
+      send(event1, event2)
     }
 
+    # Sends the function_call_output item AND the follow-up response.create
+    # so the model actually continues its turn. gpt-realtime-2 leaves the
+    # call in-flight without the response.create. Mirrors the Python
+    # send_function_call_output so both languages behave identically.
     send_function_call_output <- function(call_id, output) {
-      item <- list(
-        type = "function_call_output",
-        call_id = call_id,
-        output = jsonlite::toJSON(output, auto_unbox = TRUE),
-        object = "realtime.item"
-      )
-      event <- list(
+      item_event <- list(
         type = "conversation.item.create",
-        item = item
+        item = list(
+          type = "function_call_output",
+          call_id = call_id,
+          output = coerce_output(output)
+        )
       )
-      send(list(event))
+      response_event <- list(
+        type = "response.create",
+        response = empty_obj()
+      )
+      send(item_event, response_event)
     }
 
     # Generate client secret from OpenAI
@@ -201,7 +207,7 @@ realtime_server <- function(
       )
 
       data <- content(res)
-      return(data$value)
+      toJSON(list(value = data$value, model = model), auto_unbox = TRUE)
     })
 
     # Handle key events
@@ -225,10 +231,22 @@ realtime_server <- function(
 
             # Execute the tool function with the arguments
             result <- do.call(tool_fun, args)
+
+            # gpt-realtime-2 requires a function_call_output matching the
+            # original call_id, otherwise the model treats the call as still
+            # in-flight. send_function_call_output also emits response.create
+            # so the model continues its turn.
+            send_function_call_output(event$call_id, result)
           },
           error = function(e) {
-            shiny::printStackTrace(e)
-            send_text(paste("Error processing function call:", e$message))
+            # Avoid shiny::printStackTrace — dropTrivialFrames can crash apps.
+            # Forward the actual error message so the model can tell the user
+            # what went wrong instead of silently guessing.
+            message("Error processing function call: ", conditionMessage(e))
+            send_function_call_output(
+              event$call_id,
+              paste("Error:", conditionMessage(e))
+            )
           }
         )
       }
@@ -238,17 +256,21 @@ realtime_server <- function(
       fromJSON(req(input$key_event), simplifyVector = FALSE)
     })
 
-    # Function to send events to the JS
+    # Function to send events to the JS.
+    # Preferred form:                  send(e1, e2)
+    # Also accepted (backward compat): send(list(e1, e2))
+    # Always serializes to a flat JSON array [{e1}, {e2}] so the JS
+    # handler can forEach over individual events.
     send <- function(...) {
+      events <- flatten_events(...)
+
       if (debug) {
-        for (msg in list(...)) {
-          cat("-------------\n")
-          cat("Sending events:\n")
-          cat(toJSON(msg, auto_unbox = TRUE), "\n")
-        }
+        cat("-------------\n")
+        cat("Sending events:\n")
+        cat(toJSON(events, auto_unbox = TRUE), "\n")
       }
 
-      session$sendCustomMessage("realtime_send", list(...))
+      session$sendCustomMessage("realtime_send", events)
     }
 
     # Create return object

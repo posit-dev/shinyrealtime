@@ -13,6 +13,7 @@ from pydantic import TypeAdapter
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
 from ._events import EventEmitter
+from ._utils import _coerce_output
 
 
 def dep() -> HTMLDependency:
@@ -125,6 +126,20 @@ def realtime_server(
     async def send_message():
         await send_text(input.msg())
 
+    async def send_function_call_output(call_id: str, output: Any):
+        """Send function_call_output + response.create so the model continues."""
+        await send(
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": _coerce_output(output),
+                },
+            },
+            {"type": "response.create", "response": {}},
+        )
+
     async def send_text(text: str):
         """
         Sends a text message to the AI.
@@ -190,7 +205,7 @@ def realtime_server(
                 | kwargs,
             ) as response:
                 data = await response.json()
-                return data["value"]
+                return json.dumps({"value": data["value"], "model": model})
 
     @reactive.Effect
     @reactive.event(input.key_event)
@@ -208,7 +223,11 @@ def realtime_server(
         except Exception as e:
             print(f"Event: {input.key_event()}")
             print(f"Error processing event: {e}")
-            await send_text("The function call you sent was malformed, try again?")
+            await send_text(
+                "(System: an internal event could not be parsed. "
+                "Please briefly let the user know something went wrong.)"
+            )
+            return
 
         print("-------------")
         print(event["type"])
@@ -226,9 +245,14 @@ def realtime_server(
                     _result = await tool(**args)
                 else:
                     _result = tool(**args)
-                # TODO: Return the result to the model?
+                # gpt-realtime-2 requires a function_call_output matching the
+                # call_id, otherwise the model treats the call as in-flight.
+                await send_function_call_output(event["call_id"], _result)
         except Exception as e:
-            await send_text(f"Error processing function call: {e}")
+            print(f"Error processing function call: {e}")
+            # Forward the actual error message so the model can tell the user
+            # what went wrong instead of silently guessing.
+            await send_function_call_output(event["call_id"], f"Error: {e}")
 
     async def send(*events: dict[str, Any]):
         """

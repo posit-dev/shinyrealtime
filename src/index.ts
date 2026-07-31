@@ -3,7 +3,7 @@ import { Connection } from "./Connection";
 import { MicButton } from "./MicButton";
 import "./styles.css";
 
-export async function openConnection(ephemeralKey: string) {
+export async function openConnection(ephemeralKey: string, model: string) {
   // Create a peer connection
   const pc = new RTCPeerConnection();
 
@@ -29,8 +29,7 @@ export async function openConnection(ephemeralKey: string) {
   await pc.setLocalDescription(offer);
 
   const baseUrl = "https://api.openai.com/v1/realtime/calls";
-  const model = "gpt-realtime";
-  const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+  const sdpResponse = await fetch(`${baseUrl}?model=${encodeURIComponent(model)}`, {
     method: "POST",
     body: offer.sdp,
     headers: {
@@ -58,8 +57,15 @@ class RealtimeBinding extends Shiny.OutputBinding {
   renderValue(el, data) {
     const id = this.getId(el);
 
+    // The server ships {value, model} as a JSON-encoded string. Server and
+    // client ship together in the same package version, so no fallback is
+    // needed for an older bare-string payload.
+    const parsed = JSON.parse(data);
+    const ephemeralKey: string = parsed.value;
+    const model: string = parsed.model;
+
     // Store connection in element data for cleanup
-    let connectionPromise = openConnection(data).then((connection) => {
+    let connectionPromise = openConnection(ephemeralKey, model).then((connection) => {
       $(document).on("shiny:disconnected", function () {
         console.log("Shiny disconnected, cleaning up any WebRTC connections");
         connection.close();
